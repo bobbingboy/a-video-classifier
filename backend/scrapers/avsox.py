@@ -1,13 +1,8 @@
 import httpx
 from bs4 import BeautifulSoup
 
-# 備用域名列表，依序嘗試，遇到 403/連線失敗時切換
-# seedmm.bond 為目前較新的鏡像；javbus.com 為官方但常被牆
 _BASE_URLS = [
-    "https://www.seedmm.bond",
-    "https://www.javsee.bond",
-    "https://www.dmmsee.ink",
-    "https://www.javbus.com",
+    "https://avsox.click",
 ]
 
 HEADERS = {
@@ -22,7 +17,7 @@ HEADERS = {
 
 async def fetch(code: str) -> dict | None:
     """
-    Query Javbus for a JAV product code.
+    Query Avsox for a JAV product code.
     Tries each domain in _BASE_URLS until one succeeds.
     Returns a metadata dict or None if not found.
     """
@@ -35,53 +30,69 @@ async def fetch(code: str) -> dict | None:
 
 
 async def _fetch_from(client: httpx.AsyncClient, base_url: str, code: str) -> dict | None:
-    url = f"{base_url}/{code}"
+    search_url = f"{base_url}/cn/search/{code}"
     try:
-        resp = await client.get(url)
+        resp = await client.get(search_url)
         if resp.status_code in (403, 429, 503):
             return None
         if resp.status_code != 200:
             return None
-        return _parse(resp.text, code, base_url)
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        detail_path = _find_exact_result(soup, code)
+        if not detail_path:
+            return None
+
+        detail_url = base_url + detail_path
+        detail_resp = await client.get(detail_url)
+        if detail_resp.status_code != 200:
+            return None
+
+        return _parse(detail_resp.text, code)
     except httpx.RequestError:
         return None
 
 
-def _parse(html: str, code: str, base_url: str = "") -> dict | None:
-    soup = BeautifulSoup(html, "html.parser")
+def _find_exact_result(soup: BeautifulSoup, code: str) -> str | None:
+    """Return the href of the first result whose title contains the exact code."""
+    for box in soup.select("div.photo-info"):
+        span = box.select_one("span")
+        if span and code.upper() in span.text.upper():
+            link = box.find_parent("a")
+            if link:
+                href = link.get("href", "")
+                # Return only the path portion
+                if href.startswith("http"):
+                    from urllib.parse import urlparse
+                    return urlparse(href).path
+                return href
+    return None
 
-    # Bail out early if Javbus shows a "not found" page
-    if soup.find("title") and "404" in (soup.find("title").text or ""):
-        return None
+
+def _parse(html: str, code: str) -> dict | None:
+    soup = BeautifulSoup(html, "html.parser")
 
     title_tag = soup.select_one("div.container h3")
     title = title_tag.text.strip() if title_tag else None
     if not title:
         return None
 
-    cover_tag = soup.select_one("a.bigImage img") or soup.select_one("div#video_jacket img")
+    cover_tag = soup.select_one("a.bigImage img") or soup.select_one("div.screencap img")
     cover_url = cover_tag.get("src") if cover_tag else None
-    if cover_url:
-        if cover_url.startswith("//"):
-            cover_url = "https:" + cover_url
-        elif cover_url.startswith("/"):
-            cover_url = base_url + cover_url
+    if cover_url and cover_url.startswith("//"):
+        cover_url = "https:" + cover_url
 
-    info = {}
-    for p in soup.select("div.col-md-3.info p"):
+    info: dict[str, str] = {}
+    for p in soup.select("div.info p"):
         label_tag = p.find("span", class_="header")
         if not label_tag:
             continue
         label = label_tag.text.strip().rstrip(":")
         value_tag = p.find("a") or p.find("span", class_=False)
         value = value_tag.text.strip() if value_tag else p.text.replace(label, "").strip().strip(":")
-
         info[label] = value
 
-    # Actors
     actors = [a.text.strip() for a in soup.select("div#avatar-waterfall a.avatar-box span")]
-
-    # Tags/genres
     tags = [a.text.strip() for a in soup.select("span.genre a")]
 
     studio = info.get("製作商") or info.get("Studio") or info.get("廠商")
@@ -95,5 +106,5 @@ def _parse(html: str, code: str, base_url: str = "") -> dict | None:
         "release_date": release_date,
         "actors": actors,
         "tags": tags,
-        "source": "javbus",
+        "source": "avsox",
     }

@@ -1,11 +1,9 @@
 import httpx
 from bs4 import BeautifulSoup
 
-# 備用域名列表，依序嘗試，遇到 403/連線失敗時切換
-# javdb570 為目前標註的最新鏡像，javdb.com 為永久域名但常被牆
 _BASE_URLS = [
-    "https://javdb570.com",
-    "https://javdb.com",
+    "https://www.z93j.com/cn",
+    "https://www.javlibrary.com/cn",
 ]
 
 HEADERS = {
@@ -20,7 +18,7 @@ HEADERS = {
 
 async def fetch(code: str) -> dict | None:
     """
-    Query JavDB for a JAV product code.
+    Query JavLib for a JAV product code.
     Tries each domain in _BASE_URLS until one succeeds.
     Returns a metadata dict or None if not found.
     """
@@ -33,7 +31,7 @@ async def fetch(code: str) -> dict | None:
 
 
 async def _fetch_from(client: httpx.AsyncClient, base_url: str, code: str) -> dict | None:
-    search_url = f"{base_url}/search?q={code}&f=all"
+    search_url = f"{base_url}/vl_searchbyid.php?keyword={code}"
     try:
         resp = await client.get(search_url)
         if resp.status_code in (403, 429, 503):
@@ -42,53 +40,64 @@ async def _fetch_from(client: httpx.AsyncClient, base_url: str, code: str) -> di
             return None
 
         soup = BeautifulSoup(resp.text, "html.parser")
-        result = _find_exact_result(soup, code)
-        if not result:
+
+        # If redirected directly to a detail page (single result)
+        if soup.select_one("#video_title"):
+            return _parse(resp.text, code, base_url)
+
+        # Multiple results — find exact code match
+        detail_path = _find_exact_result(soup, code)
+        if not detail_path:
             return None
 
-        detail_url = base_url + result
+        detail_url = f"{base_url}/{detail_path.lstrip('/')}"
         detail_resp = await client.get(detail_url)
         if detail_resp.status_code != 200:
             return None
 
-        return _parse(detail_resp.text, code)
+        return _parse(detail_resp.text, code, base_url)
     except httpx.RequestError:
         return None
 
 
 def _find_exact_result(soup: BeautifulSoup, code: str) -> str | None:
-    """Return the href of the first search result whose code matches exactly."""
-    for item in soup.select("div.item"):
-        strong = item.select_one("strong")
-        if strong and strong.text.strip().upper() == code.upper():
+    """Return the href of the first result whose ID matches the code exactly."""
+    for item in soup.select("div.video"):
+        id_tag = item.select_one("div.id")
+        if id_tag and id_tag.text.strip().upper() == code.upper():
             link = item.select_one("a")
             return link.get("href") if link else None
     return None
 
 
-def _parse(html: str, code: str) -> dict | None:
+def _parse(html: str, code: str, base_url: str) -> dict | None:
     soup = BeautifulSoup(html, "html.parser")
 
-    title_tag = soup.select_one("strong.current-title") or soup.select_one("h2.title strong")
+    title_tag = soup.select_one("#video_title a") or soup.select_one("#video_title h3")
     title = title_tag.text.strip() if title_tag else None
     if not title:
         return None
 
-    cover_tag = soup.select_one("img.video-cover")
+    cover_tag = soup.select_one("#video_jacket_img")
     cover_url = cover_tag.get("src") if cover_tag else None
+    if cover_url and cover_url.startswith("//"):
+        cover_url = "https:" + cover_url
 
-    info: dict[str, str] = {}
-    for panel in soup.select("div.panel-block"):
-        label_tag = panel.select_one("strong")
-        value_tag = panel.select_one("span.value")
-        if label_tag and value_tag:
-            info[label_tag.text.strip().rstrip(":")] = value_tag.text.strip()
+    actors = [
+        a.text.strip()
+        for a in soup.select("#video_cast .cast .star a")
+    ]
 
-    actors = [a.text.strip() for a in soup.select("div.panel-block a[href*='/actors/']")]
-    tags = [a.text.strip() for a in soup.select("div.panel-block a[href*='/tags/']")]
+    tags = [
+        a.text.strip()
+        for a in soup.select("#video_genres .genre a")
+    ]
 
-    studio = info.get("片商") or info.get("Studio")
-    release_date = info.get("日期") or info.get("Date")
+    studio_tag = soup.select_one("#video_maker .maker a")
+    studio = studio_tag.text.strip() if studio_tag else None
+
+    date_tag = soup.select_one("#video_date .text")
+    release_date = date_tag.text.strip() if date_tag else None
 
     return {
         "code": code,
@@ -98,5 +107,5 @@ def _parse(html: str, code: str) -> dict | None:
         "release_date": release_date,
         "actors": actors,
         "tags": tags,
-        "source": "javdb",
+        "source": "javlib",
     }
