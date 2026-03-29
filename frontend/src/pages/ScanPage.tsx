@@ -12,6 +12,9 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
+import FolderOpenIcon from "@mui/icons-material/FolderOpen";
+import FolderPickerDialog from "../components/FolderPickerDialog";
+import ImageSearchIcon from "@mui/icons-material/ImageSearch";
 import { type ScanStatus, scanApi } from "../api/videos";
 
 export default function ScanPage() {
@@ -20,6 +23,12 @@ export default function ScanPage() {
   const [scanning, setScanning] = useState(false);
   const [unmatched, setUnmatched] = useState<{ id: number; file_path: string; inputCode: string }[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerTargetIdx, setPickerTargetIdx] = useState<number>(0);
+  const [importingCovers, setImportingCovers] = useState(false);
+  const [importResult, setImportResult] = useState<{ matched: number; skipped: number } | null>(null);
+
+  const openPicker = (idx: number) => { setPickerTargetIdx(idx); setPickerOpen(true); };
 
   const addFolder = () => setFolders((f) => [...f, ""]);
   const removeFolder = (i: number) => setFolders((f) => f.filter((_, idx) => idx !== i));
@@ -88,14 +97,17 @@ export default function ScanPage() {
 
       <Stack spacing={1} sx={{ mb: 2 }}>
         {folders.map((f, i) => (
-          <Stack key={i} direction="row" spacing={1}>
+          <Stack key={i} direction="row" spacing={1} alignItems="center">
             <TextField
               fullWidth
               size="small"
               value={f}
               onChange={(e) => updateFolder(i, e.target.value)}
-              placeholder={`資料夾路徑 #${i + 1}，例如 D:/Videos`}
+              placeholder={`資料夾路徑 #${i + 1}，例如 D:\Videos`}
             />
+            <IconButton size="small" onClick={() => openPicker(i)} sx={{ color: "text.secondary" }} title="瀏覽">
+              <FolderOpenIcon fontSize="small" />
+            </IconButton>
             {folders.length > 1 && (
               <IconButton size="small" onClick={() => removeFolder(i)} sx={{ color: "text.secondary" }}>
                 <CloseIcon fontSize="small" />
@@ -110,14 +122,44 @@ export default function ScanPage() {
         </Box>
       </Stack>
 
-      <Button
-        variant="contained"
-        onClick={startScan}
-        disabled={scanning}
-        sx={{ mb: 3 }}
-      >
-        {scanning ? "掃描中..." : "開始掃描"}
-      </Button>
+      <FolderPickerDialog
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(path) => updateFolder(pickerTargetIdx, path)}
+      />
+
+      <Stack direction="row" spacing={1.5} sx={{ mb: 3 }}>
+        <Button
+          variant="contained"
+          onClick={startScan}
+          disabled={scanning}
+        >
+          {scanning ? "掃描中..." : "開始掃描"}
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<ImageSearchIcon />}
+          disabled={importingCovers}
+          onClick={async () => {
+            setImportingCovers(true);
+            setImportResult(null);
+            try {
+              const r = await scanApi.localCovers();
+              setImportResult(r.data);
+            } finally {
+              setImportingCovers(false);
+            }
+          }}
+        >
+          {importingCovers ? "掃描中..." : "匯入本地封面"}
+        </Button>
+      </Stack>
+
+      {importResult && (
+        <Alert severity="success" sx={{ mb: 3 }} onClose={() => setImportResult(null)}>
+          封面匯入完成：{importResult.matched} 筆已匯入，{importResult.skipped} 筆略過
+        </Alert>
+      )}
 
       {status && (
         <Box sx={{ mb: 4 }}>

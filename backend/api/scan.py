@@ -1,6 +1,9 @@
 import asyncio
 import os
+import re
+import shutil
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -155,7 +158,7 @@ async def _process_one(code: str, file_path: str, db: Session):
         video.studio_id = studio.id
 
     db.query(VideoActor).filter(VideoActor.video_id == video.id).delete()
-    for name in dict.fromkeys(meta.get("actors", [])):
+    for name in dict.fromkeys(meta.get("actors") or []):
         actor = db.query(Actor).filter(Actor.name == name).first()
         if not actor:
             actor = Actor(name=name)
@@ -164,7 +167,7 @@ async def _process_one(code: str, file_path: str, db: Session):
         db.add(VideoActor(video_id=video.id, actor_id=actor.id))
 
     db.query(VideoTag).filter(VideoTag.video_id == video.id).delete()
-    for name in dict.fromkeys(meta.get("tags", [])):
+    for name in dict.fromkeys(meta.get("tags") or []):
         tag = db.query(Tag).filter(Tag.name == name).first()
         if not tag:
             tag = Tag(name=name)
@@ -179,6 +182,70 @@ async def _process_one(code: str, file_path: str, db: Session):
         if local_path:
             db.query(Video).filter(Video.id == video.id).update({"cover_local_path": local_path})
             db.commit()
+
+
+_COVERS_DIR = Path(__file__).parent.parent.parent / "covers"
+_COVER_EXTS = [".jpg", ".jpeg", ".png", ".webp"]
+_FALLBACK_NAMES = ["poster", "fanart", "cover", "thumb"]
+
+
+def _sanitize_code(code: str) -> str:
+    return re.sub(r'[<>:"/\\|?*]', "_", code)
+
+
+@router.post("/scan/local-covers")
+def scan_local_covers(force: bool = False, db: Session = Depends(get_db)):
+    """Scan video folders for existing cover images and import them into covers/."""
+    _COVERS_DIR.mkdir(exist_ok=True)
+
+    query = db.query(Video).filter(Video.file_path.isnot(None))
+    if not force:
+        query = query.filter(
+            (Video.cover_local_path.is_(None)) | (Video.cover_local_path == "")
+        )
+
+    videos = query.all()
+    matched = 0
+    skipped = 0
+
+    for video in videos:
+        folder = Path(video.file_path).parent
+        if not folder.exists():
+            skipped += 1
+            continue
+
+        safe_code = _sanitize_code(video.code)
+        found: Path | None = None
+
+        # Try {code}.ext first
+        for ext in _COVER_EXTS:
+            candidate = folder / f"{safe_code}{ext}"
+            if candidate.exists():
+                found = candidate
+                break
+
+        # Try fallback names
+        if not found:
+            for name in _FALLBACK_NAMES:
+                for ext in _COVER_EXTS:
+                    candidate = folder / f"{name}{ext}"
+                    if candidate.exists():
+                        found = candidate
+                        break
+                if found:
+                    break
+
+        if not found:
+            skipped += 1
+            continue
+
+        dest = _COVERS_DIR / f"{safe_code}{found.suffix}"
+        shutil.copy2(found, dest)
+        video.cover_local_path = f"covers/{safe_code}{found.suffix}"
+        matched += 1
+
+    db.commit()
+    return {"matched": matched, "skipped": skipped}
 
 
 @router.post("/videos/{video_id}/fetch")
