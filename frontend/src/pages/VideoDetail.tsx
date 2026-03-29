@@ -123,7 +123,7 @@ export default function VideoDetailPage() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, maxWidth: 1280, mx: "auto" }}>
       {/* 返回列 */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2.5 }}>
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} size="small" sx={{ color: "text.secondary" }}>
@@ -155,7 +155,7 @@ export default function VideoDetailPage() {
       {/* 媒體區塊：封面 / 播放器（合一） */}
       {(video.cover_local_path || (!editing && video.file_path?.toLowerCase().endsWith(".mp4"))) && (
         <Box sx={{ mb: 3 }}>
-          <Paper elevation={6} sx={{ borderRadius: 2, overflow: "hidden", display: "inline-block", maxWidth: "100%" }}>
+          <Paper elevation={6} sx={{ borderRadius: 2, overflow: "hidden" }}>
             {!editing && video.file_path?.toLowerCase().endsWith(".mp4") ? (
               videoStarted ? (
                 <Box
@@ -163,7 +163,7 @@ export default function VideoDetailPage() {
                   src={`http://localhost:8000/api/videos/${video.id}/stream`}
                   controls
                   autoPlay
-                  sx={{ width: "100%", maxWidth: 720, display: "block" }}
+                  sx={{ width: "100%", display: "block" }}
                 />
               ) : (
                 <Box
@@ -175,10 +175,10 @@ export default function VideoDetailPage() {
                       component="img"
                       src={coverSrc(video.cover_local_path)}
                       alt={video.title || video.code}
-                      sx={{ width: "100%", maxWidth: 720, display: "block" }}
+                      sx={{ width: "100%", display: "block" }}
                     />
                   ) : (
-                    <Box sx={{ width: 720, height: 405, bgcolor: "grey.900" }} />
+                    <Box sx={{ width: "100%", aspectRatio: "16/9", bgcolor: "grey.900" }} />
                   )}
                   <Box
                     sx={{
@@ -216,7 +216,7 @@ export default function VideoDetailPage() {
                 component="img"
                 src={coverSrc(video.cover_local_path!)}
                 alt={video.title || video.code}
-                sx={{ width: "100%", maxWidth: 720, display: "block" }}
+                sx={{ width: "100%", display: "block" }}
               />
             )}
           </Paper>
@@ -340,60 +340,63 @@ function ViewMode({ video, onActorClick }: { video: IVideoDetail; onActorClick: 
 
   return (
     <Box>
-      <Typography variant="h6" fontWeight={600} sx={{ mb: 0.5, lineHeight: 1.4 }}>
-        {video.title || "（無標題）"}
-      </Typography>
-      <Typography variant="caption" color="primary.light" fontWeight={700} sx={{ letterSpacing: 1 }}>
-        {video.code}
-      </Typography>
+      {/* 標題列 */}
+      <Stack direction="row" alignItems="baseline" spacing={2} sx={{ mb: 1.5, flexWrap: "wrap" }}>
+        <Typography variant="h6" fontWeight={600} sx={{ lineHeight: 1.4 }}>
+          {video.title || "（無標題）"}
+        </Typography>
+        <Typography variant="caption" color="primary.light" fontWeight={700} sx={{ letterSpacing: 1, whiteSpace: "nowrap" }}>
+          {video.code}
+        </Typography>
+      </Stack>
 
-      <Divider sx={{ my: 2 }} />
-
-      <Stack spacing={1} sx={{ mb: 2.5 }}>
+      {/* meta 欄位橫排 */}
+      <Stack direction="row" spacing={3} sx={{ mb: 2, flexWrap: "wrap", rowGap: 0.75 }}>
         {meta.filter(([, v]) => v).map(([label, value]) => (
-          <Stack key={label} direction="row" spacing={1.5}>
-            <Typography variant="body2" color="text.disabled" sx={{ width: 68, flexShrink: 0 }}>
-              {label}
-            </Typography>
+          <Stack key={label} direction="row" spacing={0.75} alignItems="center">
+            <Typography variant="caption" color="text.disabled">{label}</Typography>
             <Typography variant="body2">{value}</Typography>
           </Stack>
         ))}
       </Stack>
 
-      {/* 演員 */}
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="caption" color="text.disabled" display="block" sx={{ mb: 0.75, textTransform: "uppercase", letterSpacing: 0.8 }}>
-          演員
-        </Typography>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
-          {video.actors.length === 0
-            ? <Typography variant="body2" color="text.disabled">—</Typography>
-            : video.actors.map((a) => (
-                <Chip
-                  key={a.id}
-                  label={a.name}
-                  size="small"
-                  onClick={() => onActorClick(a.name)}
-                  clickable
-                  sx={{ bgcolor: "#2a2a4a", color: "#a5b4fc", "&:hover": { bgcolor: "#3a3a6a" } }}
-                />
-              ))}
-        </Box>
-      </Box>
+      <Divider sx={{ mb: 2 }} />
 
-      {/* 分類 */}
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="caption" color="text.disabled" display="block" sx={{ mb: 0.75, textTransform: "uppercase", letterSpacing: 0.8 }}>
-          分類
-        </Typography>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
-          {video.tags.length === 0
-            ? <Typography variant="body2" color="text.disabled">—</Typography>
-            : video.tags.map((t) => (
-                <Chip key={t.id} label={t.name} size="small" sx={{ bgcolor: "#1e2e1e", color: "#86efac" }} />
-              ))}
+      {/* 演員 + 分類 橫向並排 */}
+      <Stack direction="row" spacing={4} sx={{ mb: 2, flexWrap: "wrap", rowGap: 2 }}>
+        <Box sx={{ minWidth: 180 }}>
+          <Typography variant="caption" color="text.disabled" display="block" sx={{ mb: 0.75, textTransform: "uppercase", letterSpacing: 0.8 }}>
+            演員
+          </Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+            {video.actors.length === 0
+              ? <Typography variant="body2" color="text.disabled">—</Typography>
+              : video.actors.map((a) => (
+                  <Chip
+                    key={a.id}
+                    label={a.name}
+                    size="small"
+                    onClick={() => onActorClick(a.name)}
+                    clickable
+                    sx={{ bgcolor: "#2a2a4a", color: "#a5b4fc", "&:hover": { bgcolor: "#3a3a6a" } }}
+                  />
+                ))}
+          </Box>
         </Box>
-      </Box>
+
+        <Box sx={{ flex: 1, minWidth: 200 }}>
+          <Typography variant="caption" color="text.disabled" display="block" sx={{ mb: 0.75, textTransform: "uppercase", letterSpacing: 0.8 }}>
+            分類
+          </Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+            {video.tags.length === 0
+              ? <Typography variant="body2" color="text.disabled">—</Typography>
+              : video.tags.map((t) => (
+                  <Chip key={t.id} label={t.name} size="small" sx={{ bgcolor: "#1e2e1e", color: "#86efac" }} />
+                ))}
+          </Box>
+        </Box>
+      </Stack>
 
       {video.file_path && (
         <>
