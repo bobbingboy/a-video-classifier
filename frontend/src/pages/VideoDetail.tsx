@@ -163,7 +163,7 @@ export default function VideoDetailPage() {
                   src={`http://localhost:8000/api/videos/${video.id}/stream`}
                   controls
                   autoPlay
-                  sx={{ width: "100%", display: "block" }}
+                  sx={{ width: "100%", display: "block", colorScheme: "dark" }}
                 />
               ) : (
                 <Box
@@ -178,7 +178,7 @@ export default function VideoDetailPage() {
                       sx={{ width: "100%", display: "block" }}
                     />
                   ) : (
-                    <Box sx={{ width: "100%", aspectRatio: "16/9", bgcolor: "grey.900" }} />
+                    <Box sx={{ width: "100%", aspectRatio: "16/9", bgcolor: "background.default" }} />
                   )}
                   <Box
                     sx={{
@@ -187,9 +187,9 @@ export default function VideoDetailPage() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      bgcolor: "rgba(0,0,0,0.25)",
-                      transition: "bgcolor 0.2s",
-                      "&:hover": { bgcolor: "rgba(0,0,0,0.4)" },
+                      bgcolor: "rgba(17,17,17,0.35)",
+                      transition: "background-color 0.2s",
+                      "&:hover": { bgcolor: "rgba(17,17,17,0.55)" },
                     }}
                   >
                     <Box
@@ -197,13 +197,16 @@ export default function VideoDetailPage() {
                         width: 72,
                         height: 72,
                         borderRadius: "50%",
-                        bgcolor: "rgba(0,0,0,0.55)",
-                        border: "2px solid rgba(255,255,255,0.75)",
+                        bgcolor: "primary.main",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        transition: "transform 0.15s",
-                        ".MuiBox-root:hover > * > &": { transform: "scale(1.08)" },
+                        boxShadow: "0 0 24px rgba(79,70,229,0.5)",
+                        transition: "transform 0.15s, box-shadow 0.15s",
+                        "&:hover": {
+                          transform: "scale(1.08)",
+                          boxShadow: "0 0 32px rgba(79,70,229,0.75)",
+                        },
                       }}
                     >
                       <PlayArrowIcon sx={{ fontSize: 44, color: "white", ml: "3px" }} />
