@@ -88,9 +88,32 @@ export const videosApi = {
   update: (id: number, data: VideoUpdate) =>
     client.put<VideoDetail>(`/api/videos/${id}`, data),
 
-  refetch: (id: number) =>
-    client.post<{ status: string; code: string; cover_local_path: string | null }>(`/api/videos/${id}/fetch`),
+  refetch: (id: number, code?: string) =>
+    client.post<{ status: string; code: string; cover_local_path: string | null }>(
+      `/api/videos/${id}/fetch`,
+      null,
+      { params: code ? { code } : undefined },
+    ),
+
+  setTitle: (id: number, title: string) =>
+    client.post<{ status: string }>(`/api/videos/${id}/set-title`, { title }),
+
+  search: (q: string, pageSize = 5) =>
+    client.get<VideoListResponse>("/api/videos", {
+      params: { q, page_size: pageSize, exclude_unmatched: true },
+    }),
 };
+
+export interface CodePreview {
+  found: boolean;
+  title?: string;
+  cover_url?: string;
+  studio?: string;
+  actors?: string[];
+  tags?: string[];
+  release_date?: string;
+  source?: string;
+}
 
 export const scanApi = {
   // folder_paths 為空陣列時後端會改讀 VIDEOS_FOLDERS env
@@ -101,6 +124,9 @@ export const scanApi = {
 
   localCovers: (force = false) =>
     client.post<{ matched: number; skipped: number }>(`/api/scan/local-covers?force=${force}`),
+
+  preview: (code: string) =>
+    client.get<CodePreview>("/api/scan/preview", { params: { code } }),
 };
 
 export const actorsApi = {

@@ -95,6 +95,10 @@ class VideoUpdate(BaseModel):
     cover_url: Optional[str] = None
 
 
+class SetTitleRequest(BaseModel):
+    title: str
+
+
 class ScanRequest(BaseModel):
     # 若不傳，則從環境變數 VIDEOS_FOLDERS 讀取（逗號分隔）
     folder_paths: list[str] | None = None

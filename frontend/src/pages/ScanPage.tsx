@@ -30,6 +30,10 @@ interface UnmatchedItem {
   title: string | null;
   file_path: string;
   inputCode: string;
+  inputTitle: string;
+  searchResults: VideoSummary[] | null;
+  searching: boolean;
+  confirming: boolean;
 }
 
 function UnmatchedTab({ onLoad }: { onLoad: (count: number) => void }) {
@@ -44,6 +48,10 @@ function UnmatchedTab({ onLoad }: { onLoad: (count: number) => void }) {
       title: v.title || null,
       file_path: v.file_path || "",
       inputCode: "",
+      inputTitle: "",
+      searchResults: null,
+      searching: false,
+      confirming: false,
     }));
     setItems(mapped);
     onLoad(mapped.length);
@@ -51,17 +59,51 @@ function UnmatchedTab({ onLoad }: { onLoad: (count: number) => void }) {
 
   useEffect(() => { load(); }, []);
 
-  const handleSubmit = async (idx: number) => {
+  const updateItem = (idx: number, patch: Partial<UnmatchedItem>) =>
+    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
+
+  // 番號查詢（修正：透過 code 參數傳入新番號）
+  const handleFetchByCode = async (idx: number) => {
     const item = items[idx];
     const code = item.inputCode.trim().toUpperCase();
     if (!code) return;
-    await fetch(`http://localhost:8000/api/videos/${item.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    await fetch(`http://localhost:8000/api/videos/${item.id}/fetch`, { method: "POST" });
-    setItems((prev) => prev.filter((_, i) => i !== idx));
+    updateItem(idx, { searching: true });
+    try {
+      await videosApi.refetch(item.id, code);
+      setItems((prev) => prev.filter((_, i) => i !== idx));
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || "查詢失敗");
+      updateItem(idx, { searching: false });
+    }
+  };
+
+  // 標題搜尋：先在本庫搜尋預覽，讓使用者確認
+  const handleSearchByTitle = async (idx: number) => {
+    const item = items[idx];
+    const title = item.inputTitle.trim();
+    if (!title) return;
+    updateItem(idx, { searching: true, searchResults: null });
+    try {
+      const r = await videosApi.search(title);
+      updateItem(idx, { searching: false, searchResults: r.data.items });
+    } catch {
+      updateItem(idx, { searching: false, searchResults: [] });
+    }
+  };
+
+  // 確認套用標題
+  const handleConfirmTitle = async (idx: number) => {
+    const item = items[idx];
+    const title = item.inputTitle.trim();
+    if (!title) return;
+    updateItem(idx, { confirming: true });
+    try {
+      await videosApi.setTitle(item.id, title);
+      setItems((prev) => prev.filter((_, i) => i !== idx));
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || "設定標題失敗");
+      updateItem(idx, { confirming: false });
+    }
   };
 
   if (items.length === 0) {
@@ -90,28 +132,98 @@ function UnmatchedTab({ onLoad }: { onLoad: (count: number) => void }) {
           <Typography variant="caption" color="text.disabled" display="block" sx={{ mb: 1, wordBreak: "break-all", fontSize: 10 }}>
             {item.file_path}
           </Typography>
-          <Stack direction="row" spacing={1}>
+
+          {/* 番號查詢 */}
+          <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
             <TextField
               size="small"
               fullWidth
               value={item.inputCode}
-              onChange={(e) =>
-                setItems((prev) =>
-                  prev.map((p, i) => (i === idx ? { ...p, inputCode: e.target.value } : p))
-                )
-              }
+              disabled={item.searching || item.confirming}
+              onChange={(e) => updateItem(idx, { inputCode: e.target.value })}
+              onKeyDown={(e) => { if (e.key === "Enter") handleFetchByCode(idx); }}
               placeholder="手動輸入正確番號，例如 SSIS-123"
             />
             <Button
               variant="contained"
               size="small"
               color="success"
-              disabled={!item.inputCode.trim()}
-              onClick={() => handleSubmit(idx)}
+              disabled={!item.inputCode.trim() || item.searching || item.confirming}
+              onClick={() => handleFetchByCode(idx)}
+              sx={{ whiteSpace: "nowrap" }}
             >
-              查詢
+              {item.searching && item.inputCode.trim() ? "查詢中..." : "番號查詢"}
             </Button>
           </Stack>
+
+          {/* 標題搜尋 */}
+          <Stack direction="row" spacing={1}>
+            <TextField
+              size="small"
+              fullWidth
+              value={item.inputTitle}
+              disabled={item.searching || item.confirming}
+              onChange={(e) => updateItem(idx, { inputTitle: e.target.value, searchResults: null })}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSearchByTitle(idx); }}
+              placeholder="輸入標題進行搜尋確認..."
+            />
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={!item.inputTitle.trim() || item.searching || item.confirming}
+              onClick={() => handleSearchByTitle(idx)}
+              sx={{ whiteSpace: "nowrap" }}
+            >
+              {item.searching && item.inputTitle.trim() ? "搜尋中..." : "搜尋"}
+            </Button>
+          </Stack>
+
+          {/* 搜尋結果 */}
+          {item.searchResults !== null && (
+            <Box sx={{ mt: 1, pl: 0.5 }}>
+              {item.searchResults.length === 0 ? (
+                <Typography variant="caption" color="text.disabled">
+                  庫中無相符結果
+                </Typography>
+              ) : (
+                <Stack spacing={0.5} sx={{ mb: 0.5 }}>
+                  {item.searchResults.map((v) => (
+                    <Stack key={v.id} direction="row" spacing={1} alignItems="center">
+                      {v.cover_local_path ? (
+                        <Box
+                          component="img"
+                          src={`http://localhost:8000/${v.cover_local_path}`}
+                          sx={{ width: 40, height: 27, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }}
+                        />
+                      ) : (
+                        <Box sx={{ width: 40, height: 27, bgcolor: "action.hover", borderRadius: 0.5, flexShrink: 0 }} />
+                      )}
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="caption" fontWeight={700} color="primary.light" display="block">
+                          {v.code}
+                        </Typography>
+                        {v.title && (
+                          <Typography variant="caption" color="text.secondary" noWrap display="block" sx={{ fontSize: 10 }}>
+                            {v.title}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+              <Button
+                variant="contained"
+                size="small"
+                color="warning"
+                disabled={item.confirming}
+                onClick={() => handleConfirmTitle(idx)}
+                sx={{ mt: 0.5, fontSize: 11 }}
+              >
+                {item.confirming ? "套用中..." : `確認套用標題「${item.inputTitle.trim()}」`}
+              </Button>
+            </Box>
+          )}
         </Paper>
       ))}
     </Stack>

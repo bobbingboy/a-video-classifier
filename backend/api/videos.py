@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from backend.database import get_db
 from backend.models import Actor, Studio, Tag, Video, VideoActor, VideoTag
-from backend.schemas import VideoDetail, VideoListResponse, VideoSummary, VideoUpdate
+from backend.schemas import SetTitleRequest, VideoDetail, VideoListResponse, VideoSummary, VideoUpdate
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
 
@@ -158,3 +158,16 @@ def update_video(video_id: int, data: VideoUpdate, db: Session = Depends(get_db)
     db.commit()
     db.refresh(video)
     return get_video(video_id, db)
+
+
+@router.post("/{video_id}/set-title")
+def set_video_title(video_id: int, data: SetTitleRequest, db: Session = Depends(get_db)):
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+    video.title = data.title
+    video.metadata_source = "manual"
+    if video.status == "unmatched":
+        video.status = "needs_manual_review"
+    db.commit()
+    return {"status": "ok"}

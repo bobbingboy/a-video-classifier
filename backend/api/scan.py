@@ -5,7 +5,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal, get_db
@@ -213,6 +213,15 @@ def _sanitize_code(code: str) -> str:
     return re.sub(r'[<>:"/\\|?*]', "_", code)
 
 
+@router.get("/scan/preview")
+async def preview_metadata(code: str = Query(..., description="番號")):
+    """查詢番號的 metadata 預覽，不寫入資料庫。"""
+    meta = await fetch_metadata(code.strip().upper())
+    if not meta:
+        return {"found": False}
+    return {"found": True, **meta}
+
+
 @router.post("/scan/local-covers")
 def scan_local_covers(force: bool = False, db: Session = Depends(get_db)):
     """Scan video folders for existing cover images and import them into covers/."""
@@ -267,13 +276,23 @@ def scan_local_covers(force: bool = False, db: Session = Depends(get_db)):
 
 
 @router.post("/videos/{video_id}/fetch")
-async def refetch_video(video_id: int, db: Session = Depends(get_db)):
+async def refetch_video(
+    video_id: int,
+    code: str | None = Query(None, description="Override the code used for fetching"),
+    db: Session = Depends(get_db),
+):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
-    if not video.code or video.code == "UNMATCHED":
+
+    effective_code = (code or "").strip().upper() or video.code or ""
+    if not effective_code or effective_code.startswith("UNMATCHED"):
         raise HTTPException(status_code=400, detail="Video has no valid code to fetch")
 
-    await _process_one(video.code, video.file_path or "", db)
+    if code and code.strip().upper() != video.code:
+        video.code = code.strip().upper()
+        db.commit()
+
+    await _process_one(effective_code, video.file_path or "", db)
     db.refresh(video)
     return {"status": "ok", "code": video.code, "cover_local_path": video.cover_local_path}
