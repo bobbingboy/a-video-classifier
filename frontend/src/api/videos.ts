@@ -22,6 +22,7 @@ export interface VideoSummary {
   cover_local_path: string | null;
   status: string;
   metadata_source: string | null;
+  tags: Tag[];
 }
 
 export interface VideoDetail extends VideoSummary {

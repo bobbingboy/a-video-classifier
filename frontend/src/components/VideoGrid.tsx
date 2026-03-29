@@ -98,6 +98,23 @@ export default function VideoGrid({ videos, onSelect }: Props) {
                     {v.title}
                   </Typography>
                 )}
+                {v?.tags?.length > 0 && (
+                  <Box sx={{ mt: 0.75, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                    {v.tags.slice(0, 4).map((tag) => (
+                      <Chip
+                        key={tag.id}
+                        label={tag.name}
+                        size="small"
+                        sx={{ height: 16, fontSize: 10, "& .MuiChip-label": { px: 0.75 } }}
+                      />
+                    ))}
+                    {v.tags.length > 4 && (
+                      <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10, alignSelf: "center" }}>
+                        +{v.tags.length - 4}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
               </CardContent>
             </CardActionArea>
           </Card>

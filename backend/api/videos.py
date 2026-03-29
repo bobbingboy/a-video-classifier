@@ -41,13 +41,27 @@ def list_videos(
         )
 
     total = query.count()
-    items = query.offset((page - 1) * page_size).limit(page_size).all()
+    items = (
+        query
+        .options(joinedload(Video.tags).joinedload(VideoTag.tag))
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
 
     return VideoListResponse(
         total=total,
         page=page,
         page_size=page_size,
-        items=[VideoSummary.model_validate(v) for v in items],
+        items=[VideoSummary.model_validate({
+            "id": v.id,
+            "code": v.code,
+            "title": v.title,
+            "cover_local_path": v.cover_local_path,
+            "status": v.status,
+            "metadata_source": v.metadata_source,
+            "tags": [vt.tag for vt in v.tags if vt.tag],
+        }) for v in items],
     )
 
 

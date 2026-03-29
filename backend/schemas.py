@@ -53,6 +53,7 @@ class VideoSummary(BaseModel):
     cover_local_path: Optional[str]
     status: str
     metadata_source: Optional[str]
+    tags: list[TagOut] = []
 
     model_config = {"from_attributes": True}
 
