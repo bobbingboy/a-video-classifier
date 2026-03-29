@@ -1,5 +1,16 @@
 import { createTheme } from "@mui/material/styles";
 
+// 全域 CSS keyframes
+const spinKeyframes = `
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+`;
+const styleEl = document.createElement("style");
+styleEl.textContent = spinKeyframes;
+document.head.appendChild(styleEl);
+
 const theme = createTheme({
   shape: {
     borderRadius: 12,

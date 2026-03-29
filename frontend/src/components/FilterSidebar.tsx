@@ -2,14 +2,17 @@ import { useEffect, useState } from "react";
 import {
   Avatar,
   Box,
+  IconButton,
   Typography,
   Chip,
   Divider,
   TextField,
   InputAdornment,
   Stack,
+  Tooltip,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import SyncIcon from "@mui/icons-material/Sync";
 import { type ActorWithCount, type TagWithCount, actorsApi, tagsApi } from "../api/videos";
 
 interface Props {
@@ -24,6 +27,7 @@ export default function FilterSidebar({ selectedActor, selectedTag, onActorChang
   const [tags, setTags] = useState<TagWithCount[]>([]);
   const [actorQ, setActorQ] = useState("");
   const [tagQ, setTagQ] = useState("");
+  const [refetchingId, setRefetchingId] = useState<number | null>(null);
 
   useEffect(() => {
     actorsApi.list().then((r) => setActors(r.data));
@@ -91,6 +95,8 @@ export default function FilterSidebar({ selectedActor, selectedTag, onActorChang
                   cursor: "pointer",
                   gap: 1,
                   "&:hover": { bgcolor: "action.hover" },
+                  "&:hover .actor-rescan-btn": { opacity: 1 },
+                  "& .actor-rescan-btn": { opacity: 0, transition: "opacity 0.15s" },
                 }}
               >
                 <Avatar
@@ -106,6 +112,25 @@ export default function FilterSidebar({ selectedActor, selectedTag, onActorChang
                 <Typography variant="caption" color="text.disabled" sx={{ flexShrink: 0 }}>
                   {a.video_count}
                 </Typography>
+                <Tooltip title="重新掃描此演員所有影片" placement="right">
+                  <IconButton
+                    className="actor-rescan-btn"
+                    size="small"
+                    disabled={refetchingId === a.id}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      setRefetchingId(a.id);
+                      try {
+                        await actorsApi.refetchVideos(a.id);
+                      } finally {
+                        setRefetchingId(null);
+                      }
+                    }}
+                    sx={{ p: 0.25, color: "text.disabled", flexShrink: 0 }}
+                  >
+                    <SyncIcon sx={{ fontSize: 14, animation: refetchingId === a.id ? "spin 1s linear infinite" : "none" }} />
+                  </IconButton>
+                </Tooltip>
               </Box>
             ))}
         </Stack>
