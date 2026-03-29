@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+backend/venv/
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Environment
+.env
+
+# Logs
+logs/
+
+# Node
+frontend/node_modules/
+
+# Build output
+frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db
