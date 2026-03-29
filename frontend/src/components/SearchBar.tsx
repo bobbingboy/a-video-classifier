@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { TextField, InputAdornment } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
 
 interface Props {
   value: string;
@@ -14,20 +16,18 @@ export default function SearchBar({ value, onChange }: Props) {
   }, [local]);
 
   return (
-    <input
-      type="text"
+    <TextField
+      fullWidth
+      size="small"
       placeholder="搜尋番號、標題、演員..."
       value={local}
       onChange={(e) => setLocal(e.target.value)}
-      style={{
-        width: "100%",
-        padding: "8px 12px",
-        fontSize: "14px",
-        border: "1px solid #444",
-        borderRadius: "6px",
-        background: "#1a1a1a",
-        color: "#fff",
-        outline: "none",
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
+          </InputAdornment>
+        ),
       }}
     />
   );

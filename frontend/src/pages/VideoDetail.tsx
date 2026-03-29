@@ -1,18 +1,27 @@
 import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  Box,
+  Button,
+  Chip,
+  Stack,
+  Typography,
+  TextField,
+  CircularProgress,
+} from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { type VideoDetail as IVideoDetail, type VideoUpdate, videosApi } from "../api/videos";
-
-interface Props {
-  videoId: number;
-  onBack: () => void;
-  onActorClick: (name: string) => void;
-}
 
 function coverSrc(path: string | null): string {
   if (!path) return "";
   return `http://localhost:8000/${path}`;
 }
 
-export default function VideoDetailPage({ videoId, onBack, onActorClick }: Props) {
+export default function VideoDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const videoId = Number(id);
+
   const [video, setVideo] = useState<IVideoDetail | null>(null);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<VideoUpdate>({});
@@ -51,100 +60,126 @@ export default function VideoDetailPage({ videoId, onBack, onActorClick }: Props
     setVideo(r.data);
   };
 
-  if (!video) return <div style={{ color: "#aaa", padding: "40px" }}>載入中...</div>;
+  if (!video) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", pt: 8 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
-    <div style={{ maxWidth: "900px", margin: "0 auto", padding: "24px" }}>
-      <button onClick={onBack} style={btnStyle}>← 返回</button>
+    <Box sx={{ maxWidth: 900, mx: "auto", p: 3 }}>
+      <Button
+        startIcon={<ArrowBackIcon />}
+        onClick={() => navigate(-1)}
+        size="small"
+        sx={{ mb: 2, color: "text.secondary" }}
+      >
+        返回
+      </Button>
 
-      <div style={{ display: "flex", gap: "32px", marginTop: "24px" }}>
-        <div style={{ flexShrink: 0 }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={3}>
+        <Box sx={{ flexShrink: 0 }}>
           {video.cover_local_path ? (
-            <img
+            <Box
+              component="img"
               src={coverSrc(video.cover_local_path)}
               alt={video.title || video.code}
-              style={{ width: "240px", borderRadius: "8px" }}
+              sx={{ width: 240, borderRadius: 2, display: "block" }}
             />
           ) : (
-            <div style={{ width: "240px", height: "340px", background: "#2a2a2a", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", color: "#666" }}>
-              No Cover
-            </div>
+            <Box
+              sx={{
+                width: 240,
+                height: 340,
+                bgcolor: "#2a2a2a",
+                borderRadius: 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Typography color="text.disabled">No Cover</Typography>
+            </Box>
           )}
-          <div style={{ marginTop: "12px", display: "flex", gap: "8px" }}>
-            <button onClick={() => setEditing(!editing)} style={btnStyle}>
+          <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+            <Button variant="outlined" size="small" onClick={() => setEditing(!editing)}>
               {editing ? "取消" : "編輯"}
-            </button>
-            <button onClick={handleRefetch} style={btnStyle}>重新抓取</button>
-          </div>
-        </div>
+            </Button>
+            <Button variant="outlined" size="small" onClick={handleRefetch}>
+              重新抓取
+            </Button>
+          </Stack>
+        </Box>
 
-        <div style={{ flex: 1 }}>
+        <Box sx={{ flex: 1 }}>
           {editing ? (
             <EditForm form={form} setForm={setForm} onSave={handleSave} saving={saving} />
           ) : (
-            <ViewMode video={video} onActorClick={onActorClick} />
+            <ViewMode video={video} onActorClick={(name) => { navigate(`/?actor=${encodeURIComponent(name)}`); }} />
           )}
-        </div>
-      </div>
-    </div>
+        </Box>
+      </Stack>
+    </Box>
   );
 }
 
 function ViewMode({ video, onActorClick }: { video: IVideoDetail; onActorClick: (n: string) => void }) {
   return (
-    <div style={{ color: "#ddd" }}>
-      <h1 style={{ fontSize: "20px", marginBottom: "8px" }}>{video.title || "（無標題）"}</h1>
-      <div style={{ color: "#888", fontSize: "13px", marginBottom: "16px" }}>{video.code}</div>
+    <Box>
+      <Typography variant="h6" gutterBottom>{video.title || "（無標題）"}</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{video.code}</Typography>
 
-      <Row label="出版商">{video.studio?.name || "—"}</Row>
-      <Row label="發行日期">{video.release_date || "—"}</Row>
-      <Row label="時長">{video.duration || "—"}</Row>
-      <Row label="來源">{video.metadata_source || "—"}</Row>
-      <Row label="狀態">{video.status}</Row>
+      {[
+        ["出版商", video.studio?.name],
+        ["發行日期", video.release_date],
+        ["時長", video.duration],
+        ["來源", video.metadata_source],
+        ["狀態", video.status],
+      ].map(([label, value]) => (
+        <Stack key={label} direction="row" spacing={1.5} sx={{ mb: 1 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ width: 72, flexShrink: 0 }}>
+            {label}
+          </Typography>
+          <Typography variant="body2">{value || "—"}</Typography>
+        </Stack>
+      ))}
 
-      <div style={{ marginTop: "16px" }}>
-        <div style={{ color: "#888", fontSize: "12px", marginBottom: "6px" }}>演員</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-          {video.actors.length === 0 && <span style={{ color: "#555" }}>—</span>}
-          {video.actors.map((a) => (
-            <span
-              key={a.id}
-              onClick={() => onActorClick(a.name)}
-              style={{ background: "#2a2a4a", color: "#a5b4fc", padding: "3px 10px", borderRadius: "20px", fontSize: "13px", cursor: "pointer" }}
-            >
-              {a.name}
-            </span>
-          ))}
-        </div>
-      </div>
+      <Box sx={{ mt: 2 }}>
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>演員</Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+          {video.actors.length === 0
+            ? <Typography variant="body2" color="text.disabled">—</Typography>
+            : video.actors.map((a) => (
+                <Chip
+                  key={a.id}
+                  label={a.name}
+                  size="small"
+                  onClick={() => onActorClick(a.name)}
+                  sx={{ cursor: "pointer", bgcolor: "#2a2a4a", color: "#a5b4fc" }}
+                />
+              ))}
+        </Box>
+      </Box>
 
-      <div style={{ marginTop: "16px" }}>
-        <div style={{ color: "#888", fontSize: "12px", marginBottom: "6px" }}>分類</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-          {video.tags.length === 0 && <span style={{ color: "#555" }}>—</span>}
-          {video.tags.map((t) => (
-            <span key={t.id} style={{ background: "#1a2a1a", color: "#86efac", padding: "3px 10px", borderRadius: "20px", fontSize: "13px" }}>
-              {t.name}
-            </span>
-          ))}
-        </div>
-      </div>
+      <Box sx={{ mt: 2 }}>
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>分類</Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+          {video.tags.length === 0
+            ? <Typography variant="body2" color="text.disabled">—</Typography>
+            : video.tags.map((t) => (
+                <Chip key={t.id} label={t.name} size="small" sx={{ bgcolor: "#1a2a1a", color: "#86efac" }} />
+              ))}
+        </Box>
+      </Box>
 
       {video.file_path && (
-        <div style={{ marginTop: "16px", fontSize: "12px", color: "#555", wordBreak: "break-all" }}>
+        <Typography variant="caption" color="text.disabled" sx={{ mt: 2, display: "block", wordBreak: "break-all" }}>
           {video.file_path}
-        </div>
+        </Typography>
       )}
-    </div>
-  );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ display: "flex", gap: "12px", marginBottom: "8px", fontSize: "14px" }}>
-      <span style={{ color: "#666", width: "72px", flexShrink: 0 }}>{label}</span>
-      <span style={{ color: "#ddd" }}>{children}</span>
-    </div>
+    </Box>
   );
 }
 
@@ -159,53 +194,39 @@ function EditForm({
   onSave: () => void;
   saving: boolean;
 }) {
-  const field = (label: string, key: keyof VideoUpdate, type = "text") => (
-    <div style={{ marginBottom: "12px" }}>
-      <label style={{ color: "#888", fontSize: "12px", display: "block", marginBottom: "4px" }}>{label}</label>
-      <input
-        type={type}
-        value={(form[key] as string) || ""}
-        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-        style={{ width: "100%", padding: "6px 10px", background: "#1a1a1a", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "14px" }}
-      />
-    </div>
-  );
-
   return (
-    <div>
-      {field("標題", "title")}
-      {field("出版商", "studio_name")}
-      {field("發行日期", "release_date")}
-      {field("時長", "duration")}
-      <div style={{ marginBottom: "12px" }}>
-        <label style={{ color: "#888", fontSize: "12px", display: "block", marginBottom: "4px" }}>演員（逗號分隔）</label>
-        <input
-          value={(form.actor_names || []).join(", ")}
-          onChange={(e) => setForm({ ...form, actor_names: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
-          style={{ width: "100%", padding: "6px 10px", background: "#1a1a1a", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "14px" }}
+    <Stack spacing={2}>
+      {(["title", "studio_name", "release_date", "duration"] as const).map((key) => (
+        <TextField
+          key={key}
+          label={{ title: "標題", studio_name: "出版商", release_date: "發行日期", duration: "時長" }[key]}
+          size="small"
+          fullWidth
+          value={(form[key] as string) || ""}
+          onChange={(e) => setForm({ ...form, [key]: e.target.value })}
         />
-      </div>
-      <div style={{ marginBottom: "16px" }}>
-        <label style={{ color: "#888", fontSize: "12px", display: "block", marginBottom: "4px" }}>分類（逗號分隔）</label>
-        <input
-          value={(form.tag_names || []).join(", ")}
-          onChange={(e) => setForm({ ...form, tag_names: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
-          style={{ width: "100%", padding: "6px 10px", background: "#1a1a1a", border: "1px solid #444", borderRadius: "4px", color: "#fff", fontSize: "14px" }}
-        />
-      </div>
-      <button onClick={onSave} disabled={saving} style={{ ...btnStyle, background: "#4f46e5" }}>
+      ))}
+      <TextField
+        label="演員（逗號分隔）"
+        size="small"
+        fullWidth
+        value={(form.actor_names || []).join(", ")}
+        onChange={(e) =>
+          setForm({ ...form, actor_names: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })
+        }
+      />
+      <TextField
+        label="分類（逗號分隔）"
+        size="small"
+        fullWidth
+        value={(form.tag_names || []).join(", ")}
+        onChange={(e) =>
+          setForm({ ...form, tag_names: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })
+        }
+      />
+      <Button variant="contained" onClick={onSave} disabled={saving}>
         {saving ? "儲存中..." : "儲存"}
-      </button>
-    </div>
+      </Button>
+    </Stack>
   );
 }
-
-const btnStyle: React.CSSProperties = {
-  padding: "6px 14px",
-  background: "#2a2a2a",
-  border: "1px solid #444",
-  borderRadius: "6px",
-  color: "#ddd",
-  cursor: "pointer",
-  fontSize: "13px",
-};
