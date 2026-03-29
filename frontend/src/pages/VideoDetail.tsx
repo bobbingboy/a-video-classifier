@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EditIcon from "@mui/icons-material/Edit";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SaveIcon from "@mui/icons-material/Save";
 import CloseIcon from "@mui/icons-material/Close";
@@ -34,6 +35,7 @@ export default function VideoDetailPage() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<VideoUpdate>({});
   const [saving, setSaving] = useState(false);
+  const [videoStarted, setVideoStarted] = useState(false);
 
   // 番號修改狀態
   const [codeInput, setCodeInput] = useState("");
@@ -55,6 +57,7 @@ export default function VideoDetailPage() {
   };
 
   useEffect(() => {
+    setVideoStarted(false);
     videosApi.get(videoId).then((r) => {
       setVideo(r.data);
       initForm(r.data);
@@ -149,22 +152,76 @@ export default function VideoDetailPage() {
         </Stack>
       </Stack>
 
-      {/* 封面 */}
-      {video.cover_local_path ? (
+      {/* 媒體區塊：封面 / 播放器（合一） */}
+      {(video.cover_local_path || (!editing && video.file_path?.toLowerCase().endsWith(".mp4"))) && (
         <Box sx={{ mb: 3 }}>
-          <Paper
-            elevation={6}
-            sx={{ borderRadius: 2, overflow: "hidden", display: "inline-block", maxWidth: "100%" }}
-          >
-            <Box
-              component="img"
-              src={coverSrc(video.cover_local_path)}
-              alt={video.title || video.code}
-              sx={{ width: "100%", maxWidth: 720, display: "block" }}
-            />
+          <Paper elevation={6} sx={{ borderRadius: 2, overflow: "hidden", display: "inline-block", maxWidth: "100%" }}>
+            {!editing && video.file_path?.toLowerCase().endsWith(".mp4") ? (
+              videoStarted ? (
+                <Box
+                  component="video"
+                  src={`http://localhost:8000/api/videos/${video.id}/stream`}
+                  controls
+                  autoPlay
+                  sx={{ width: "100%", maxWidth: 720, display: "block" }}
+                />
+              ) : (
+                <Box
+                  sx={{ position: "relative", cursor: "pointer", display: "block", lineHeight: 0 }}
+                  onClick={() => setVideoStarted(true)}
+                >
+                  {video.cover_local_path ? (
+                    <Box
+                      component="img"
+                      src={coverSrc(video.cover_local_path)}
+                      alt={video.title || video.code}
+                      sx={{ width: "100%", maxWidth: 720, display: "block" }}
+                    />
+                  ) : (
+                    <Box sx={{ width: 720, height: 405, bgcolor: "grey.900" }} />
+                  )}
+                  <Box
+                    sx={{
+                      position: "absolute",
+                      inset: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      bgcolor: "rgba(0,0,0,0.25)",
+                      transition: "bgcolor 0.2s",
+                      "&:hover": { bgcolor: "rgba(0,0,0,0.4)" },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 72,
+                        height: 72,
+                        borderRadius: "50%",
+                        bgcolor: "rgba(0,0,0,0.55)",
+                        border: "2px solid rgba(255,255,255,0.75)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "transform 0.15s",
+                        ".MuiBox-root:hover > * > &": { transform: "scale(1.08)" },
+                      }}
+                    >
+                      <PlayArrowIcon sx={{ fontSize: 44, color: "white", ml: "3px" }} />
+                    </Box>
+                  </Box>
+                </Box>
+              )
+            ) : (
+              <Box
+                component="img"
+                src={coverSrc(video.cover_local_path!)}
+                alt={video.title || video.code}
+                sx={{ width: "100%", maxWidth: 720, display: "block" }}
+              />
+            )}
           </Paper>
         </Box>
-      ) : null}
+      )}
 
       {/* 內容 */}
       <Box>

@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+import re
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -158,6 +162,75 @@ def update_video(video_id: int, data: VideoUpdate, db: Session = Depends(get_db)
     db.commit()
     db.refresh(video)
     return get_video(video_id, db)
+
+
+@router.get("/{video_id}/stream")
+def stream_video(video_id: int, request: Request, db: Session = Depends(get_db)):
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    file_path = video.file_path
+    if not file_path:
+        raise HTTPException(status_code=404, detail="No file path recorded")
+
+    if not file_path.lower().endswith(".mp4"):
+        raise HTTPException(status_code=415, detail="Only .mp4 files are supported for streaming")
+
+    path = Path(file_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    file_size = path.stat().st_size
+    chunk_size = 1024 * 1024  # 1 MB
+
+    range_header = request.headers.get("Range")
+    if range_header:
+        match = re.match(r"bytes=(\d+)-(\d*)", range_header)
+        if match:
+            start = int(match.group(1))
+            end = int(match.group(2)) if match.group(2) else file_size - 1
+            end = min(end, file_size - 1)
+            content_length = end - start + 1
+
+            def iter_range():
+                with open(path, "rb") as f:
+                    f.seek(start)
+                    remaining = content_length
+                    while remaining > 0:
+                        data = f.read(min(chunk_size, remaining))
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+
+            return StreamingResponse(
+                iter_range(),
+                status_code=206,
+                media_type="video/mp4",
+                headers={
+                    "Content-Range": f"bytes {start}-{end}/{file_size}",
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(content_length),
+                },
+            )
+
+    def iter_full():
+        with open(path, "rb") as f:
+            while True:
+                data = f.read(chunk_size)
+                if not data:
+                    break
+                yield data
+
+    return StreamingResponse(
+        iter_full(),
+        media_type="video/mp4",
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(file_size),
+        },
+    )
 
 
 @router.post("/{video_id}/set-title")
