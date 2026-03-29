@@ -11,7 +11,7 @@ load_dotenv()
 
 from backend.database import init_db
 from backend.logger import get_logger, setup_logging
-from backend.api import actors, scan, tags, videos
+from backend.api import actors, browse, scan, tags, videos
 
 setup_logging()
 log = get_logger("api")
@@ -52,10 +52,16 @@ covers_dir = Path(__file__).parent.parent / "covers"
 covers_dir.mkdir(exist_ok=True)
 app.mount("/covers", StaticFiles(directory=str(covers_dir)), name="covers")
 
+# Serve actor photos as static files
+actor_photos_dir = Path(__file__).parent.parent / "actor_photos"
+actor_photos_dir.mkdir(exist_ok=True)
+app.mount("/actor_photos", StaticFiles(directory=str(actor_photos_dir)), name="actor_photos")
+
 app.include_router(videos.router)
 app.include_router(scan.router)
 app.include_router(actors.router)
 app.include_router(tags.router)
+app.include_router(browse.router)
 
 
 @app.on_event("startup")

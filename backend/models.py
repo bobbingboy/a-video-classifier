@@ -20,6 +20,7 @@ class Actor(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False, index=True)
+    photo_local_path = Column(String, nullable=True)
 
     videos = relationship("VideoActor", back_populates="actor")
 

@@ -15,8 +15,13 @@ class ActorWithCount(BaseModel):
     id: int
     name: str
     video_count: int
+    photo_local_path: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class ActorPhotoResponse(BaseModel):
+    photo_url: Optional[str] = None
 
 
 class TagOut(BaseModel):
