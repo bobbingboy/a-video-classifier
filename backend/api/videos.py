@@ -16,9 +16,21 @@ def list_videos(
     q: str | None = None,
     actor: str | None = None,
     tag: str | None = None,
+    status: str | None = None,
+    no_cover: bool = False,
+    exclude_unmatched: bool = False,
     db: Session = Depends(get_db),
 ):
     query = db.query(Video)
+
+    if status:
+        query = query.filter(Video.status == status)
+
+    if no_cover:
+        query = query.filter(~Video.has_cover)
+
+    if exclude_unmatched:
+        query = query.filter(Video.status != "unmatched")
 
     if q:
         like = f"%{q}%"

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from backend.database import SessionLocal, get_db
 from backend.logger import get_logger
 from backend.models import Actor, Studio, Tag, Video, VideoActor, VideoTag
-from backend.scanner import scan_new_files
+from backend.scanner import infer_actor_from_path, scan_new_files
 from backend.schemas import ScanRequest, ScanStatus
 from backend.scrapers.dispatcher import download_cover, fetch_metadata
 
@@ -71,7 +71,7 @@ async def trigger_scan(req: ScanRequest, db: Session = Depends(get_db)):
 
     for folder in folders:
         try:
-            matched, unmatched = scan_new_files(folder, db)
+            matched, unmatched = scan_new_files(folder, db, force=req.force)
             all_matched.extend(matched)
             all_unmatched.extend(unmatched)
         except FileNotFoundError as e:
@@ -90,7 +90,12 @@ async def trigger_scan(req: ScanRequest, db: Session = Depends(get_db)):
         if not existing:
             filename = os.path.basename(item["file_path"])
             unmatched_code = f"UNMATCHED_{filename}"
-            db.add(Video(file_path=item["file_path"], code=unmatched_code, status="unmatched"))
+            video = Video(file_path=item["file_path"], code=unmatched_code, status="unmatched")
+            db.add(video)
+            db.flush()
+            actor = infer_actor_from_path(item["file_path"], db)
+            if actor:
+                db.add(VideoActor(video_id=video.id, actor_id=actor.id))
     db.commit()
 
     if not all_matched:
@@ -128,6 +133,16 @@ async def _process_one(code: str, file_path: str, db: Session):
     existing = db.query(Video).filter(Video.code == code).first()
 
     meta = await fetch_metadata(code)
+    if meta:
+        log.info(
+            "metadata 取得成功 %s — 來源: %s | 標題: %s | 封面: %s",
+            code,
+            meta.get("source"),
+            meta.get("title"),
+            meta.get("cover_url") or "（無）",
+        )
+    else:
+        log.warning("metadata 查無結果 %s", code)
     status = "ok" if meta else "needs_manual_review"
 
     if existing:
@@ -182,6 +197,11 @@ async def _process_one(code: str, file_path: str, db: Session):
         if local_path:
             db.query(Video).filter(Video.id == video.id).update({"cover_local_path": local_path})
             db.commit()
+            log.info("封面儲存成功 %s → %s", code, local_path)
+        else:
+            log.warning("封面下載失敗，未儲存 %s", code)
+    else:
+        log.info("無封面 URL，略過下載 %s", code)
 
 
 _COVERS_DIR = Path(__file__).parent.parent.parent / "covers"
@@ -200,9 +220,7 @@ def scan_local_covers(force: bool = False, db: Session = Depends(get_db)):
 
     query = db.query(Video).filter(Video.file_path.isnot(None))
     if not force:
-        query = query.filter(
-            (Video.cover_local_path.is_(None)) | (Video.cover_local_path == "")
-        )
+        query = query.filter(~Video.has_cover)
 
     videos = query.all()
     matched = 0
@@ -258,4 +276,4 @@ async def refetch_video(video_id: int, db: Session = Depends(get_db)):
 
     await _process_one(video.code, video.file_path or "", db)
     db.refresh(video)
-    return {"status": "ok", "code": video.code}
+    return {"status": "ok", "code": video.code, "cover_local_path": video.cover_local_path}

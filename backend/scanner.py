@@ -3,7 +3,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from backend.models import Video
+from backend.models import Actor, Video
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".avi", ".wmv", ".mov"}
 
@@ -57,22 +57,36 @@ def parse_code(filename: str) -> str | None:
     return None
 
 
+def infer_actor_from_path(file_path: str, db: Session) -> Actor | None:
+    """Walk up the directory tree from file_path and return the first Actor
+    whose name matches a folder name. Returns None if no match is found."""
+    path = Path(file_path)
+    for parent in path.parents:
+        actor = db.query(Actor).filter(Actor.name == parent.name).first()
+        if actor:
+            return actor
+    return None
+
+
 def get_existing_paths(db: Session) -> set[str]:
     """Return the set of file_path values already in the database."""
     rows = db.query(Video.file_path).filter(Video.file_path.isnot(None)).all()
     return {r.file_path for r in rows}
 
 
-def scan_new_files(folder_path: str, db: Session) -> tuple[list[dict], list[dict]]:
+def scan_new_files(folder_path: str, db: Session, force: bool = False) -> tuple[list[dict], list[dict]]:
     """
-    Scan folder_path for new video files not yet in the database.
+    Scan folder_path for video files.
+
+    Args:
+        force: 若 True，已在 DB 中的影片也會重新處理；否則只處理新檔案。
 
     Returns:
         matched   — list of {file_path, code} dicts ready for metadata fetch
         unmatched — list of {file_path} dicts where code could not be parsed
     """
     all_files = scan_folder(folder_path)
-    existing = get_existing_paths(db)
+    existing = get_existing_paths(db) if not force else set()
 
     matched: list[dict] = []
     unmatched: list[dict] = []

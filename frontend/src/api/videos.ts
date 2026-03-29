@@ -78,6 +78,9 @@ export const videosApi = {
     q?: string;
     actor?: string;
     tag?: string;
+    status?: string;
+    no_cover?: boolean;
+    exclude_unmatched?: boolean;
   }) => client.get<VideoListResponse>("/api/videos", { params }),
 
   get: (id: number) => client.get<VideoDetail>(`/api/videos/${id}`),
@@ -85,13 +88,14 @@ export const videosApi = {
   update: (id: number, data: VideoUpdate) =>
     client.put<VideoDetail>(`/api/videos/${id}`, data),
 
-  refetch: (id: number) => client.post(`/api/videos/${id}/fetch`),
+  refetch: (id: number) =>
+    client.post<{ status: string; code: string; cover_local_path: string | null }>(`/api/videos/${id}/fetch`),
 };
 
 export const scanApi = {
   // folder_paths 為空陣列時後端會改讀 VIDEOS_FOLDERS env
-  start: (folder_paths: string[]) =>
-    client.post("/api/scan", { folder_paths: folder_paths.length ? folder_paths : null }),
+  start: (folder_paths: string[], force = false) =>
+    client.post("/api/scan", { folder_paths: folder_paths.length ? folder_paths : null, force }),
 
   status: () => client.get<ScanStatus>("/api/scan/status"),
 
@@ -102,6 +106,8 @@ export const scanApi = {
 export const actorsApi = {
   list: () => client.get<ActorWithCount[]>("/api/actors"),
   getPhoto: (id: number) => client.get<{ photo_url: string | null }>(`/api/actors/${id}/photo`),
+  refetchVideos: (id: number) =>
+    client.post<{ status: string; count: number; actor: string }>(`/api/actors/${id}/refetch`),
 };
 
 export const tagsApi = {

@@ -98,6 +98,8 @@ class VideoUpdate(BaseModel):
 class ScanRequest(BaseModel):
     # 若不傳，則從環境變數 VIDEOS_FOLDERS 讀取（逗號分隔）
     folder_paths: list[str] | None = None
+    # force=True 時，已在 DB 中的影片也會重新處理
+    force: bool = False
 
 
 class ScanStatus(BaseModel):
