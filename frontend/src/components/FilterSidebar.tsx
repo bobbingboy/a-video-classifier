@@ -18,11 +18,15 @@ import { type ActorWithCount, type TagWithCount, actorsApi, tagsApi } from "../a
 interface Props {
   selectedActor: string;
   selectedTag: string;
+  selectedStatus: string;
+  noCover: boolean;
   onActorChange: (name: string) => void;
   onTagChange: (name: string) => void;
+  onStatusChange: (status: string) => void;
+  onNoCoverChange: (val: boolean) => void;
 }
 
-export default function FilterSidebar({ selectedActor, selectedTag, onActorChange, onTagChange }: Props) {
+export default function FilterSidebar({ selectedActor, selectedTag, selectedStatus, noCover, onActorChange, onTagChange, onStatusChange, onNoCoverChange }: Props) {
   const [actors, setActors] = useState<ActorWithCount[]>([]);
   const [tags, setTags] = useState<TagWithCount[]>([]);
   const [actorQ, setActorQ] = useState("");
@@ -44,6 +48,33 @@ export default function FilterSidebar({ selectedActor, selectedTag, onActorChang
 
   return (
     <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 2 }}>
+
+      {/* 狀態篩選 */}
+      <Box>
+        <Typography variant="overline" color="text.disabled" sx={{ fontSize: 10, letterSpacing: 1.2 }}>
+          狀態
+        </Typography>
+        <Stack spacing={0.5} sx={{ mt: 0.75 }}>
+          <Chip
+            label="未辨識"
+            size="small"
+            onClick={() => onStatusChange(selectedStatus === "unmatched" ? "" : "unmatched")}
+            variant={selectedStatus === "unmatched" ? "filled" : "outlined"}
+            color={selectedStatus === "unmatched" ? "warning" : "default"}
+            sx={{ justifyContent: "flex-start", fontSize: 12 }}
+          />
+          <Chip
+            label="無封面"
+            size="small"
+            onClick={() => onNoCoverChange(!noCover)}
+            variant={noCover ? "filled" : "outlined"}
+            color={noCover ? "warning" : "default"}
+            sx={{ justifyContent: "flex-start", fontSize: 12 }}
+          />
+        </Stack>
+      </Box>
+
+      <Divider />
 
       {/* 演員 */}
       <Box>

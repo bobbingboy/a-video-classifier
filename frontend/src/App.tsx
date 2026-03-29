@@ -46,6 +46,8 @@ function LibraryLayout() {
 
   const actor = searchParams.get("actor") ?? "";
   const tag = searchParams.get("tag") ?? "";
+  const status = searchParams.get("status") ?? "";
+  const noCover = searchParams.get("no_cover") === "1";
 
   const setActor = (val: string) => {
     setSearchParams((prev) => {
@@ -60,6 +62,24 @@ function LibraryLayout() {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       if (val) next.set("tag", val); else next.delete("tag");
+      next.delete("page");
+      return next;
+    });
+  };
+
+  const setStatus = (val: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (val) next.set("status", val); else next.delete("status");
+      next.delete("page");
+      return next;
+    });
+  };
+
+  const setNoCover = (val: boolean) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (val) next.set("no_cover", "1"); else next.delete("no_cover");
       next.delete("page");
       return next;
     });
@@ -86,14 +106,18 @@ function LibraryLayout() {
         <FilterSidebar
           selectedActor={actor}
           selectedTag={tag}
+          selectedStatus={status}
+          noCover={noCover}
           onActorChange={(a) => { setActor(a); navigate({ pathname: "/", search: `?actor=${encodeURIComponent(a)}` }); }}
           onTagChange={setTag}
+          onStatusChange={setStatus}
+          onNoCoverChange={setNoCover}
         />
       </Drawer>
 
       <Box component="main" sx={{ flex: 1, overflowY: "auto" }}>
         <Routes>
-          <Route path="/" element={<LibraryPage actor={actor} tag={tag} />} />
+          <Route path="/" element={<LibraryPage actor={actor} tag={tag} status={status} noCover={noCover} />} />
           <Route path="/video/:id" element={<VideoDetailPage />} />
         </Routes>
       </Box>
@@ -101,7 +125,7 @@ function LibraryLayout() {
   );
 }
 
-function LibraryPage({ actor, tag }: { actor: string; tag: string }) {
+function LibraryPage({ actor, tag, status, noCover }: { actor: string; tag: string; status: string; noCover: boolean }) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [q, setQ] = useState(searchParams.get("q") ?? "");
@@ -134,12 +158,14 @@ function LibraryPage({ actor, tag }: { actor: string; tag: string }) {
         q: q || undefined,
         actor: actor || undefined,
         tag: tag || undefined,
+        status: status || undefined,
+        no_cover: noCover || undefined,
       })
       .then((r) => {
         setVideos(r.data.items);
         setTotal(r.data.total);
       });
-  }, [q, actor, tag, currentPage]);
+  }, [q, actor, tag, status, noCover, currentPage]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
