@@ -105,45 +105,31 @@ export default function VideoDetailPage() {
         </Stack>
       </Stack>
 
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={3} alignItems="flex-start">
-        {/* 封面 */}
-        <Box sx={{ flexShrink: 0 }}>
+      {/* 封面 */}
+      {video.cover_local_path ? (
+        <Box sx={{ mb: 3 }}>
           <Paper
             elevation={6}
-            sx={{ borderRadius: 2, overflow: "hidden", width: 220, bgcolor: "#1e1e1e" }}
+            sx={{ borderRadius: 2, overflow: "hidden", display: "inline-block", maxWidth: "100%" }}
           >
-            {video.cover_local_path ? (
-              <Box
-                component="img"
-                src={coverSrc(video.cover_local_path)}
-                alt={video.title || video.code}
-                sx={{ width: "100%", display: "block" }}
-              />
-            ) : (
-              <Box
-                sx={{
-                  width: 220,
-                  height: 310,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Typography color="text.disabled" fontSize={13}>No Cover</Typography>
-              </Box>
-            )}
+            <Box
+              component="img"
+              src={coverSrc(video.cover_local_path)}
+              alt={video.title || video.code}
+              sx={{ width: "100%", maxWidth: 720, display: "block" }}
+            />
           </Paper>
         </Box>
+      ) : null}
 
-        {/* 內容 */}
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          {editing ? (
-            <EditForm form={form} setForm={setForm} />
-          ) : (
-            <ViewMode video={video} onActorClick={(name) => navigate(`/?actor=${encodeURIComponent(name)}`)} />
-          )}
-        </Box>
-      </Stack>
+      {/* 內容 */}
+      <Box>
+        {editing ? (
+          <EditForm form={form} setForm={setForm} />
+        ) : (
+          <ViewMode video={video} onActorClick={(name) => navigate(`/?actor=${encodeURIComponent(name)}`)} />
+        )}
+      </Box>
     </Box>
   );
 }
