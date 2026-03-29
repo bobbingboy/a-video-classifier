@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
+  Alert,
   Box,
   Button,
   Chip,
@@ -17,7 +18,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SaveIcon from "@mui/icons-material/Save";
 import CloseIcon from "@mui/icons-material/Close";
-import { type VideoDetail as IVideoDetail, type VideoUpdate, videosApi } from "../api/videos";
+import { type CodePreview, type VideoDetail as IVideoDetail, type VideoUpdate, scanApi, videosApi } from "../api/videos";
 
 function coverSrc(path: string | null): string {
   if (!path) return "";
@@ -34,17 +35,29 @@ export default function VideoDetailPage() {
   const [form, setForm] = useState<VideoUpdate>({});
   const [saving, setSaving] = useState(false);
 
+  // 番號修改狀態
+  const [codeInput, setCodeInput] = useState("");
+  const [codePreview, setCodePreview] = useState<CodePreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [applyingCode, setApplyingCode] = useState(false);
+
+  const initForm = (v: IVideoDetail) => {
+    setForm({
+      title: v.title || "",
+      release_date: v.release_date || "",
+      duration: v.duration || "",
+      studio_name: v.studio?.name || "",
+      actor_names: v.actors.map((a) => a.name),
+      tag_names: v.tags.map((t) => t.name),
+    });
+    setCodeInput(v.code);
+    setCodePreview(null);
+  };
+
   useEffect(() => {
     videosApi.get(videoId).then((r) => {
       setVideo(r.data);
-      setForm({
-        title: r.data.title || "",
-        release_date: r.data.release_date || "",
-        duration: r.data.duration || "",
-        studio_name: r.data.studio?.name || "",
-        actor_names: r.data.actors.map((a) => a.name),
-        tag_names: r.data.tags.map((t) => t.name),
-      });
+      initForm(r.data);
     });
   }, [videoId]);
 
@@ -65,6 +78,37 @@ export default function VideoDetailPage() {
     await videosApi.refetch(video.id);
     const r = await videosApi.get(video.id);
     setVideo(r.data);
+  };
+
+  const handlePreviewCode = async () => {
+    const code = codeInput.trim().toUpperCase();
+    if (!code) return;
+    setPreviewLoading(true);
+    setCodePreview(null);
+    try {
+      const r = await scanApi.preview(code);
+      setCodePreview(r.data);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleApplyCode = async (force = false) => {
+    if (!video) return;
+    const code = codeInput.trim().toUpperCase();
+    if (!code) return;
+    setApplyingCode(true);
+    try {
+      await videosApi.refetch(video.id, code);
+      const r = await videosApi.get(video.id);
+      setVideo(r.data);
+      initForm(r.data);
+      setEditing(false);
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || "套用失敗");
+    } finally {
+      setApplyingCode(false);
+    }
   };
 
   if (!video) {
@@ -125,7 +169,101 @@ export default function VideoDetailPage() {
       {/* 內容 */}
       <Box>
         {editing ? (
-          <EditForm form={form} setForm={setForm} />
+          <>
+            {/* 番號修改區塊 */}
+            <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
+              <Typography variant="caption" color="text.disabled" display="block" sx={{ mb: 1, textTransform: "uppercase", letterSpacing: 0.8 }}>
+                修改番號
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ mb: codePreview ? 1.5 : 0 }}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  value={codeInput}
+                  disabled={applyingCode}
+                  onChange={(e) => { setCodeInput(e.target.value); setCodePreview(null); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") handlePreviewCode(); }}
+                  placeholder="輸入番號..."
+                  inputProps={{ style: { textTransform: "uppercase" } }}
+                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={!codeInput.trim() || codeInput.trim().toUpperCase() === video.code || previewLoading || applyingCode}
+                  onClick={handlePreviewCode}
+                  sx={{ whiteSpace: "nowrap" }}
+                >
+                  {previewLoading ? "查詢中..." : "查詢"}
+                </Button>
+              </Stack>
+
+              {codePreview && (
+                <Box>
+                  {!codePreview.found ? (
+                    <>
+                      <Alert severity="warning" sx={{ mb: 1, py: 0.5 }}>
+                        找不到番號「{codeInput.trim().toUpperCase()}」的 metadata
+                      </Alert>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        color="warning"
+                        disabled={applyingCode}
+                        onClick={() => handleApplyCode()}
+                      >
+                        {applyingCode ? "套用中..." : "強制套用番號（不更新 metadata）"}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Paper variant="outlined" sx={{ p: 1.5, mb: 1, bgcolor: "action.hover" }}>
+                        <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                          {codePreview.cover_url && (
+                            <Box
+                              component="img"
+                              src={codePreview.cover_url}
+                              sx={{ width: 90, height: 60, objectFit: "cover", borderRadius: 0.5, flexShrink: 0 }}
+                            />
+                          )}
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="body2" fontWeight={600} sx={{ mb: 0.25 }}>
+                              {codePreview.title || "（無標題）"}
+                            </Typography>
+                            {codePreview.studio && (
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                {codePreview.studio}
+                              </Typography>
+                            )}
+                            {(codePreview.actors?.length ?? 0) > 0 && (
+                              <Typography variant="caption" color="text.disabled" display="block">
+                                {codePreview.actors!.join("、")}
+                              </Typography>
+                            )}
+                            {codePreview.release_date && (
+                              <Typography variant="caption" color="text.disabled" display="block">
+                                {codePreview.release_date}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Stack>
+                      </Paper>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        color="warning"
+                        disabled={applyingCode}
+                        onClick={() => handleApplyCode()}
+                      >
+                        {applyingCode ? "套用中..." : `確認套用番號「${codeInput.trim().toUpperCase()}」`}
+                      </Button>
+                    </>
+                  )}
+                </Box>
+              )}
+            </Paper>
+
+            <EditForm form={form} setForm={setForm} />
+          </>
         ) : (
           <ViewMode video={video} onActorClick={(name) => navigate(`/?actor=${encodeURIComponent(name)}`)} />
         )}
