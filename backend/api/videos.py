@@ -66,10 +66,23 @@ def get_video(video_id: int, db: Session = Depends(get_db)):
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
 
-    result = VideoDetail.model_validate(video)
-    result.actors = [va.actor for va in video.actors]
-    result.tags = [vt.tag for vt in video.tags]
-    return result
+    return VideoDetail.model_validate({
+        "id": video.id,
+        "code": video.code,
+        "title": video.title,
+        "file_path": video.file_path,
+        "cover_url": video.cover_url,
+        "cover_local_path": video.cover_local_path,
+        "release_date": video.release_date,
+        "duration": video.duration,
+        "metadata_source": video.metadata_source,
+        "status": video.status,
+        "created_at": video.created_at,
+        "updated_at": video.updated_at,
+        "studio": video.studio,
+        "actors": [va.actor for va in video.actors if va.actor],
+        "tags": [vt.tag for vt in video.tags if vt.tag],
+    })
 
 
 @router.put("/{video_id}", response_model=VideoDetail)
