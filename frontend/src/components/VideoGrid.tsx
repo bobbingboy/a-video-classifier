@@ -30,7 +30,7 @@ export default function VideoGrid({ videos, onSelect }: Props) {
   return (
     <Grid container spacing={1.5}>
       {videos.map((v) => (
-        <Grid key={v.id} size={{ xs: 6, sm: 4, md: 3, lg: 2 }}>
+        <Grid key={v.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
           <Card
             sx={{
               height: "100%",
@@ -48,12 +48,12 @@ export default function VideoGrid({ videos, onSelect }: Props) {
                     component="img"
                     image={coverSrc(v.cover_local_path)}
                     alt={v.title || v.code}
-                    sx={{ aspectRatio: "2/3", objectFit: "cover" }}
+                    sx={{ aspectRatio: "16/9", objectFit: "cover" }}
                   />
                 ) : (
                   <Box
                     sx={{
-                      aspectRatio: "2/3",
+                      aspectRatio: "16/9",
                       bgcolor: "#1e1e1e",
                       display: "flex",
                       alignItems: "center",
