@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, and_
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 
 from backend.database import Base
@@ -56,6 +57,15 @@ class Video(Base):
     studio = relationship("Studio", back_populates="videos")
     actors = relationship("VideoActor", back_populates="video", cascade="all, delete-orphan")
     tags = relationship("VideoTag", back_populates="video", cascade="all, delete-orphan")
+
+    @hybrid_property
+    def has_cover(self) -> bool:
+        """影片是否已有本地封面圖片。"""
+        return bool(self.cover_local_path)
+
+    @has_cover.expression  # type: ignore[no-redef]
+    def has_cover(cls):
+        return and_(cls.cover_local_path.isnot(None), cls.cover_local_path != "")
 
 
 class VideoActor(Base):
