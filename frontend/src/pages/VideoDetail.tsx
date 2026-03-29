@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Alert,
@@ -36,6 +36,7 @@ export default function VideoDetailPage() {
   const [form, setForm] = useState<VideoUpdate>({});
   const [saving, setSaving] = useState(false);
   const [videoStarted, setVideoStarted] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // 番號修改狀態
   const [codeInput, setCodeInput] = useState("");
@@ -160,10 +161,25 @@ export default function VideoDetailPage() {
               videoStarted ? (
                 <Box
                   component="video"
+                  ref={videoRef}
                   src={`http://localhost:8000/api/videos/${video.id}/stream`}
                   controls
                   autoPlay
                   sx={{ width: "100%", display: "block", colorScheme: "dark" }}
+                  onLoadedMetadata={() => {
+                    const el = videoRef.current;
+                    if (!el) return;
+                    const saved = localStorage.getItem("player:volume");
+                    if (saved !== null) el.volume = parseFloat(saved);
+                    const muted = localStorage.getItem("player:muted");
+                    if (muted !== null) el.muted = muted === "1";
+                  }}
+                  onVolumeChange={() => {
+                    const el = videoRef.current;
+                    if (!el) return;
+                    localStorage.setItem("player:volume", String(el.volume));
+                    localStorage.setItem("player:muted", el.muted ? "1" : "0");
+                  }}
                 />
               ) : (
                 <Box
