@@ -1,10 +1,44 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, UniqueConstraint, and_
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, UniqueConstraint, and_
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 
 from backend.database import Base
+
+
+class ScraperSource(Base):
+    __tablename__ = "scraper_sources"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False, index=True)
+    enabled = Column(Boolean, nullable=False, default=True)
+    priority = Column(Integer, nullable=False, default=0)
+    parse_mode = Column(String, nullable=False)      # "builtin" | "selectors"
+    builtin_key = Column(String, nullable=True)       # e.g. "javbus", "javdb"
+    base_urls = Column(JSON, nullable=False, default=list)
+    access_mode = Column(String, nullable=False, default="direct")  # "direct" | "search"
+    search_url_pattern = Column(String, nullable=True)
+    result_link_selector = Column(String, nullable=True)
+    result_code_selector = Column(String, nullable=True)
+    selectors = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    stats = relationship("ScraperStats", back_populates="source", uselist=False, cascade="all, delete-orphan")
+
+
+class ScraperStats(Base):
+    __tablename__ = "scraper_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    source_id = Column(Integer, ForeignKey("scraper_sources.id", ondelete="CASCADE"), nullable=False, unique=True)
+    attempts = Column(Integer, nullable=False, default=0)
+    successes = Column(Integer, nullable=False, default=0)
+    consecutive_failures = Column(Integer, nullable=False, default=0)
+    cooldown_until = Column(DateTime, nullable=True)
+    last_attempt = Column(DateTime, nullable=True)
+
+    source = relationship("ScraperSource", back_populates="stats")
 
 
 class Studio(Base):

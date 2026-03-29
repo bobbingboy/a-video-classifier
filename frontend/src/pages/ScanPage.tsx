@@ -4,7 +4,12 @@ import {
   Button,
   Checkbox,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControlLabel,
+  Switch,
   TextField,
   LinearProgress,
   Typography,
@@ -14,14 +19,23 @@ import {
   Paper,
   Tab,
   Tabs,
+  Tooltip,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ImageSearchIcon from "@mui/icons-material/ImageSearch";
 import FolderPickerDialog from "../components/FolderPickerDialog";
 import { type ScanStatus, type VideoSummary, scanApi, videosApi } from "../api/videos";
+import {
+  type ScraperSource,
+  type SourcePayload,
+  type TestResult,
+  scrapersApi,
+} from "../api/scrapers";
 
 // ── 未辨識番號 Tab ─────────────────────────────────────────────
 interface UnmatchedItem {
@@ -367,6 +381,424 @@ function NoCoverTab() {
   );
 }
 
+// ── 搜尋來源 Tab ───────────────────────────────────────────────
+
+const EMPTY_PAYLOAD: SourcePayload = {
+  name: "",
+  enabled: true,
+  parse_mode: "builtin",
+  builtin_key: "",
+  base_urls: [],
+  access_mode: "direct",
+  search_url_pattern: null,
+  result_link_selector: null,
+  result_code_selector: null,
+  selectors: null,
+};
+// Note: parse_mode is always "builtin" in the UI; selectors mode is developer-only via code.
+
+function SourceDialog({
+  open,
+  initial,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  initial: SourcePayload;
+  onClose: () => void;
+  onSave: (p: SourcePayload) => Promise<void>;
+}) {
+  const [form, setForm] = useState<SourcePayload>(initial);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [testCode, setTestCode] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
+
+  useEffect(() => { setForm(initial); setErr(null); setTestResult(null); setTestCode(""); }, [open, initial]);
+
+  const set = (patch: Partial<SourcePayload>) => setForm((f) => ({ ...f, ...patch }));
+
+  const handleTest = async () => {
+    const code = testCode.trim().toUpperCase();
+    if (!code) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const r = await scrapersApi.testSource({
+        code,
+        name: form.name || "test",
+        parse_mode: "builtin",
+        builtin_key: form.builtin_key || null,
+        base_urls: form.base_urls,
+        access_mode: "direct",
+        search_url_pattern: null,
+        result_link_selector: null,
+        result_code_selector: null,
+        selectors: null,
+      });
+      setTestResult(r.data);
+    } catch (e: any) {
+      setTestResult({ found: false, error: e?.response?.data?.detail || "測試失敗" });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setErr(null);
+    try {
+      await onSave({
+        ...form,
+        parse_mode: "builtin",
+        selectors: null,
+        search_url_pattern: null,
+        result_link_selector: null,
+        result_code_selector: null,
+      });
+      onClose();
+    } catch (e: any) {
+      setErr(e?.response?.data?.detail || "儲存失敗");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const baseUrlsText = (form.base_urls || []).join("\n");
+
+  return (
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{initial.name ? `編輯來源：${initial.name}` : "新增搜尋來源"}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          {err && <Alert severity="error">{err}</Alert>}
+
+          <TextField
+            label="名稱"
+            size="small"
+            fullWidth
+            value={form.name}
+            onChange={(e) => set({ name: e.target.value })}
+          />
+
+          <FormControlLabel
+            control={<Switch checked={form.enabled} onChange={(e) => set({ enabled: e.target.checked })} />}
+            label="啟用"
+          />
+
+          <TextField
+            label="Builtin Key（例如 javbus、javdb）"
+            size="small"
+            fullWidth
+            value={form.builtin_key || ""}
+            onChange={(e) => set({ builtin_key: e.target.value })}
+          />
+
+          <TextField
+            label="備用域名（每行一個）"
+            size="small"
+            fullWidth
+            multiline
+            minRows={2}
+            value={baseUrlsText}
+            onChange={(e) =>
+              set({ base_urls: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })
+            }
+            placeholder={"https://www.example.com\nhttps://mirror.example.com"}
+          />
+
+          {/* ── 測試區塊 ── */}
+          <Box sx={{ borderTop: 1, borderColor: "divider", pt: 1.5 }}>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+              驗證設定
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <TextField
+                size="small"
+                fullWidth
+                value={testCode}
+                onChange={(e) => { setTestCode(e.target.value); setTestResult(null); }}
+                onKeyDown={(e) => { if (e.key === "Enter") handleTest(); }}
+                placeholder="輸入番號測試，例如 SSIS-123"
+                disabled={testing}
+              />
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleTest}
+                disabled={testing || !testCode.trim()}
+                sx={{ whiteSpace: "nowrap" }}
+              >
+                {testing ? "測試中..." : "測試"}
+              </Button>
+            </Stack>
+
+            {testResult && (
+              <Box sx={{ mt: 1 }}>
+                {(testResult.attempted_urls?.length ?? 0) > 0 && (
+                  <Box sx={{ mb: 0.75, p: 1, bgcolor: "action.hover", borderRadius: 1 }}>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.25 }}>
+                      嘗試的網址：
+                    </Typography>
+                    {testResult.attempted_urls!.map((url, i) => (
+                      <Typography
+                        key={i}
+                        variant="caption"
+                        display="block"
+                        sx={{ fontFamily: "monospace", fontSize: 11, wordBreak: "break-all", color: "text.primary" }}
+                      >
+                        {i + 1}. {url}
+                      </Typography>
+                    ))}
+                  </Box>
+                )}
+
+                {testResult.found ? (
+                  <Alert severity="success" sx={{ fontSize: 12 }}>
+                    <Stack spacing={0.5}>
+                      <Box><strong>標題：</strong>{testResult.title || "（無）"}</Box>
+                      {testResult.studio && <Box><strong>廠商：</strong>{testResult.studio}</Box>}
+                      {testResult.release_date && <Box><strong>日期：</strong>{testResult.release_date}</Box>}
+                      {(testResult.actors?.length ?? 0) > 0 && (
+                        <Box><strong>演員：</strong>{testResult.actors!.join("、")}</Box>
+                      )}
+                      {testResult.cover_url && (
+                        <Box>
+                          <strong>封面：</strong>
+                          <Box
+                            component="img"
+                            src={testResult.cover_url}
+                            sx={{ display: "block", mt: 0.5, maxHeight: 80, maxWidth: "100%", objectFit: "contain" }}
+                          />
+                        </Box>
+                      )}
+                    </Stack>
+                  </Alert>
+                ) : (
+                  <Alert severity="error" sx={{ fontSize: 12 }}>
+                    {testResult.error ?? "查無結果，請確認設定是否正確"}
+                  </Alert>
+                )}
+              </Box>
+            )}
+          </Box>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={saving}>取消</Button>
+        <Button variant="contained" onClick={handleSave} disabled={saving || !form.name.trim()}>
+          {saving ? "儲存中..." : "儲存"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function SourcesTab() {
+  const [sources, setSources] = useState<ScraperSource[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<ScraperSource | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await scrapersApi.getSources();
+      setSources(r.data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleSave = async (payload: SourcePayload) => {
+    if (editing) {
+      await scrapersApi.updateSource(editing.id, payload);
+    } else {
+      await scrapersApi.createSource(payload);
+    }
+    await load();
+  };
+
+  const handleDelete = async (id: number, name: string) => {
+    if (!confirm(`確定刪除來源「${name}」？`)) return;
+    await scrapersApi.deleteSource(id);
+    await load();
+  };
+
+  const handleToggle = async (src: ScraperSource) => {
+    const payload: SourcePayload = {
+      name: src.name,
+      enabled: !src.enabled,
+      parse_mode: src.parse_mode,
+      builtin_key: src.builtin_key,
+      base_urls: src.base_urls,
+      access_mode: src.access_mode,
+      search_url_pattern: src.search_url_pattern,
+      result_link_selector: src.result_link_selector,
+      result_code_selector: src.result_code_selector,
+      selectors: src.selectors,
+    };
+    await scrapersApi.updateSource(src.id, payload);
+    await load();
+  };
+
+  const handleImportPreset = async () => {
+    setImporting(true);
+    setImportMsg(null);
+    try {
+      const r = await scrapersApi.importPreset("jav_databases");
+      setImportMsg(`匯入完成：${r.data.imported} 筆新增，${r.data.skipped} 筆略過`);
+      await load();
+    } catch (e: any) {
+      setImportMsg(e?.response?.data?.detail || "匯入失敗");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const openAdd = () => { setEditing(null); setDialogOpen(true); };
+  const openEdit = (src: ScraperSource) => { setEditing(src); setDialogOpen(true); };
+
+  const dialogInitial: SourcePayload = editing
+    ? {
+        name: editing.name,
+        enabled: editing.enabled,
+        parse_mode: editing.parse_mode,
+        builtin_key: editing.builtin_key,
+        base_urls: editing.base_urls,
+        access_mode: editing.access_mode,
+        search_url_pattern: editing.search_url_pattern,
+        result_link_selector: editing.result_link_selector,
+        result_code_selector: editing.result_code_selector,
+        selectors: editing.selectors,
+      }
+    : EMPTY_PAYLOAD;
+
+  if (loading) return <LinearProgress sx={{ mt: 1, borderRadius: 1 }} />;
+
+  if (sources.length === 0) {
+    return (
+      <Box sx={{ py: 4, textAlign: "center" }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          尚未設定任何搜尋來源
+        </Typography>
+        {importMsg && (
+          <Alert severity="info" sx={{ mb: 2, textAlign: "left" }}>{importMsg}</Alert>
+        )}
+        <Button
+          variant="contained"
+          onClick={handleImportPreset}
+          disabled={importing}
+        >
+          {importing ? "匯入中..." : "匯入推薦 AV 資料庫來源"}
+        </Button>
+        <Box sx={{ mt: 1.5 }}>
+          <Button size="small" startIcon={<AddIcon />} onClick={openAdd} sx={{ color: "text.secondary" }}>
+            手動新增來源
+          </Button>
+        </Box>
+        <SourceDialog
+          open={dialogOpen}
+          initial={dialogInitial}
+          onClose={() => setDialogOpen(false)}
+          onSave={handleSave}
+        />
+      </Box>
+    );
+  }
+
+  return (
+    <Box>
+      {importMsg && (
+        <Alert severity="success" sx={{ mb: 1.5 }} onClose={() => setImportMsg(null)}>
+          {importMsg}
+        </Alert>
+      )}
+
+      <Stack spacing={1} sx={{ mb: 1.5 }}>
+        {sources.map((src) => {
+          const rate = src.stats?.success_rate;
+          const pct = rate != null ? Math.round(rate * 100) : null;
+          const cooling = src.stats?.in_cooldown ?? false;
+
+          return (
+            <Paper key={src.id} variant="outlined" sx={{ p: 1.5 }}>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Switch
+                  size="small"
+                  checked={src.enabled}
+                  onChange={() => handleToggle(src)}
+                />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <Typography variant="body2" fontWeight={600} noWrap>
+                      {src.name}
+                    </Typography>
+                    <Chip
+                      label={src.parse_mode}
+                      size="small"
+                      sx={{ height: 16, fontSize: 10 }}
+                    />
+                    {cooling && (
+                      <Chip label="冷卻中" size="small" color="warning" sx={{ height: 16, fontSize: 10 }} />
+                    )}
+                    {!src.enabled && (
+                      <Chip label="停用" size="small" sx={{ height: 16, fontSize: 10 }} />
+                    )}
+                  </Stack>
+                  {pct != null ? (
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                      <LinearProgress
+                        variant="determinate"
+                        value={pct}
+                        sx={{ flex: 1, height: 4, borderRadius: 2 }}
+                        color={pct >= 70 ? "success" : pct >= 40 ? "warning" : "error"}
+                      />
+                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10, whiteSpace: "nowrap" }}>
+                        {pct}% ({src.stats!.successes}/{src.stats!.attempts})
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    <Typography variant="caption" color="text.disabled" sx={{ fontSize: 10 }}>
+                      尚無資料
+                    </Typography>
+                  )}
+                </Box>
+                <Tooltip title="編輯">
+                  <IconButton size="small" onClick={() => openEdit(src)} sx={{ color: "text.secondary" }}>
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="刪除">
+                  <IconButton size="small" onClick={() => handleDelete(src.id, src.name)} sx={{ color: "text.secondary" }}>
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+            </Paper>
+          );
+        })}
+      </Stack>
+
+      <Button size="small" startIcon={<AddIcon />} onClick={openAdd} sx={{ color: "text.secondary" }}>
+        新增來源
+      </Button>
+
+      <SourceDialog
+        open={dialogOpen}
+        initial={dialogInitial}
+        onClose={() => setDialogOpen(false)}
+        onSave={handleSave}
+      />
+    </Box>
+  );
+}
+
 // ── 主頁面 ─────────────────────────────────────────────────────
 export default function ScanPage() {
   const [folders, setFolders] = useState<string[]>([""]);
@@ -535,6 +967,7 @@ export default function ScanPage() {
             }
           />
           <Tab label="無封面影片" />
+          <Tab label="搜尋來源" />
         </Tabs>
       </Box>
 
@@ -542,6 +975,7 @@ export default function ScanPage() {
         <UnmatchedTab onLoad={(count) => setUnmatchedCount(count)} />
       )}
       {tab === 1 && <NoCoverTab />}
+      {tab === 2 && <SourcesTab />}
     </Box>
   );
 }

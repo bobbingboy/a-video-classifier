@@ -24,3 +24,9 @@ frontend/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local covers cache
+covers/
+
+# Claude Code local config
+.claude/

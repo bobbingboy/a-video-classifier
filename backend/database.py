@@ -29,17 +29,12 @@ def init_db():
 
 def _run_migrations():
     """Apply any schema additions that create_all won't handle on existing tables."""
+    import sqlalchemy as sa
     with engine.connect() as conn:
-        existing = {
-            row[1]
-            for row in conn.execute(
-                __import__("sqlalchemy").text("PRAGMA table_info(actors)")
-            )
-        }
-        if "photo_local_path" not in existing:
-            conn.execute(
-                __import__("sqlalchemy").text(
-                    "ALTER TABLE actors ADD COLUMN photo_local_path TEXT"
-                )
-            )
+        actors_cols = {row[1] for row in conn.execute(sa.text("PRAGMA table_info(actors)"))}
+        if "photo_local_path" not in actors_cols:
+            conn.execute(sa.text("ALTER TABLE actors ADD COLUMN photo_local_path TEXT"))
             conn.commit()
+
+        # scraper_sources / scraper_stats are created by create_all above;
+        # nothing extra needed here yet.

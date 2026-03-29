@@ -1,0 +1,58 @@
+{
+  "name": "jav_databases",
+  "display_name": "AV 資料庫推薦來源",
+  "sources": [
+    {
+      "name": "JavBus",
+      "parse_mode": "builtin",
+      "builtin_key": "javbus",
+      "base_urls": [
+        "https://www.seedmm.bond",
+        "https://www.javsee.bond",
+        "https://www.dmmsee.ink",
+        "https://www.javbus.com"
+      ],
+      "access_mode": "direct",
+      "search_url_pattern": null,
+      "result_link_selector": null,
+      "result_code_selector": null
+    },
+    {
+      "name": "JavDB",
+      "parse_mode": "builtin",
+      "builtin_key": "javdb",
+      "base_urls": [
+        "https://javdb570.com",
+        "https://javdb.com"
+      ],
+      "access_mode": "search",
+      "search_url_pattern": "{base}/search?q={code}&f=all",
+      "result_link_selector": null,
+      "result_code_selector": null
+    },
+    {
+      "name": "Avsox",
+      "parse_mode": "builtin",
+      "builtin_key": "avsox",
+      "base_urls": [
+        "https://avsox.click"
+      ],
+      "access_mode": "search",
+      "search_url_pattern": "{base}/cn/search/{code}",
+      "result_link_selector": null,
+      "result_code_selector": null
+    },
+    {
+      "name": "JavLib",
+      "parse_mode": "builtin",
+      "builtin_key": "javlib",
+      "base_urls": [
+        "https://www.javlibrary.com"
+      ],
+      "access_mode": "search",
+      "search_url_pattern": "{base}/cn/vl_searchbyid.php?keyword={code}",
+      "result_link_selector": null,
+      "result_code_selector": null
+    }
+  ]
+}

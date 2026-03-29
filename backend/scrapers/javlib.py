@@ -16,14 +16,15 @@ HEADERS = {
 }
 
 
-async def fetch(code: str) -> dict | None:
+async def fetch(code: str, base_urls: list[str] | None = None) -> dict | None:
     """
     Query JavLib for a JAV product code.
-    Tries each domain in _BASE_URLS until one succeeds.
+    Tries each domain in base_urls (or _BASE_URLS if not provided) until one succeeds.
     Returns a metadata dict or None if not found.
     """
+    urls = base_urls if base_urls else _BASE_URLS
     async with httpx.AsyncClient(headers=HEADERS, timeout=15, follow_redirects=True) as client:
-        for base_url in _BASE_URLS:
+        for base_url in urls:
             result = await _fetch_from(client, base_url, code)
             if result is not None:
                 return result

@@ -132,7 +132,7 @@ async def _run_scan(items: list[dict]):
 async def _process_one(code: str, file_path: str, db: Session):
     existing = db.query(Video).filter(Video.code == code).first()
 
-    meta = await fetch_metadata(code)
+    meta = await fetch_metadata(code, db=db)
     if meta:
         log.info(
             "metadata 取得成功 %s — 來源: %s | 標題: %s | 封面: %s",
@@ -214,9 +214,9 @@ def _sanitize_code(code: str) -> str:
 
 
 @router.get("/scan/preview")
-async def preview_metadata(code: str = Query(..., description="番號")):
+async def preview_metadata(code: str = Query(..., description="番號"), db: Session = Depends(get_db)):
     """查詢番號的 metadata 預覽，不寫入資料庫。"""
-    meta = await fetch_metadata(code.strip().upper())
+    meta = await fetch_metadata(code.strip().upper(), db=db)
     if not meta:
         return {"found": False}
     return {"found": True, **meta}

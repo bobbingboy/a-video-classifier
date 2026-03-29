@@ -11,7 +11,7 @@ load_dotenv()
 
 from backend.database import init_db
 from backend.logger import get_logger, setup_logging
-from backend.api import actors, browse, scan, tags, videos
+from backend.api import actors, browse, scan, scrapers, tags, videos
 
 setup_logging()
 log = get_logger("api")
@@ -62,6 +62,7 @@ app.include_router(scan.router)
 app.include_router(actors.router)
 app.include_router(tags.router)
 app.include_router(browse.router)
+app.include_router(scrapers.router)
 
 
 @app.on_event("startup")
