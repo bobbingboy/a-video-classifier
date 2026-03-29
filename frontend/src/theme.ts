@@ -1,6 +1,9 @@
 import { createTheme } from "@mui/material/styles";
 
 const theme = createTheme({
+  shape: {
+    borderRadius: 12,
+  },
   palette: {
     mode: "dark",
     primary: {
