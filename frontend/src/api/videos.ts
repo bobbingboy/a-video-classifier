@@ -45,6 +45,7 @@ export interface VideoListResponse {
 
 export interface ActorWithCount extends Actor {
   video_count: number;
+  photo_local_path: string | null;
 }
 
 export interface TagWithCount extends Tag {
@@ -92,10 +93,14 @@ export const scanApi = {
     client.post("/api/scan", { folder_paths: folder_paths.length ? folder_paths : null }),
 
   status: () => client.get<ScanStatus>("/api/scan/status"),
+
+  localCovers: (force = false) =>
+    client.post<{ matched: number; skipped: number }>(`/api/scan/local-covers?force=${force}`),
 };
 
 export const actorsApi = {
   list: () => client.get<ActorWithCount[]>("/api/actors"),
+  getPhoto: (id: number) => client.get<{ photo_url: string | null }>(`/api/actors/${id}/photo`),
 };
 
 export const tagsApi = {
