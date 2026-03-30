@@ -6,7 +6,17 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///../videos.db")
+def _build_database_url() -> str:
+    host = os.getenv("DB_HOST")
+    if host:
+        user = os.getenv("DB_USER", "postgres")
+        password = os.getenv("DB_PASSWORD", "")
+        port = os.getenv("DB_PORT", "5432")
+        name = os.getenv("DB_NAME", "postgres")
+        return f"postgresql://{user}:{password}@{host}:{port}/{name}"
+    return os.getenv("DATABASE_URL", "sqlite:///../videos.db")
+
+DATABASE_URL = _build_database_url()
 
 _is_sqlite = DATABASE_URL.startswith("sqlite")
 

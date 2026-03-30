@@ -67,4 +67,9 @@ app.include_router(scrapers.router)
 
 @app.on_event("startup")
 def startup():
+    from backend.database import DATABASE_URL
+    db_display = DATABASE_URL.split("@")[-1] if "@" in DATABASE_URL else DATABASE_URL
+    log.info(f"Starting Video Library API on port 8000")
+    log.info(f"Database: {db_display}")
     init_db()
+    log.info("Database initialized successfully")
