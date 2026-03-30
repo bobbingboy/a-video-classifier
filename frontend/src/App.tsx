@@ -15,7 +15,8 @@ import SearchBar from "./components/SearchBar";
 import VideoGrid from "./components/VideoGrid";
 import VideoDetailPage from "./pages/VideoDetail";
 import ScanPage from "./pages/ScanPage";
-import { type VideoSummary, videosApi } from "./api/videos";
+import { type TagFacet, type VideoSummary, videosApi } from "./api/videos";
+import TagFacetBar from "./components/TagFacetBar";
 
 const DRAWER_WIDTH = 220;
 const PAGE_SIZE = 24;
@@ -45,7 +46,7 @@ function LibraryLayout() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const actor = searchParams.get("actor") ?? "";
-  const tag = searchParams.get("tag") ?? "";
+  const tags = searchParams.getAll("tag");
   const status = searchParams.get("status") ?? "";
   const noCover = searchParams.get("no_cover") === "1";
 
@@ -58,11 +59,23 @@ function LibraryLayout() {
     });
   };
 
-  const setTag = (val: string) => {
+  const addTag = (name: string) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      if (val) next.set("tag", val); else next.delete("tag");
+      if (!prev.getAll("tag").includes(name)) next.append("tag", name);
       next.delete("page");
+      return next;
+    });
+  };
+
+  const removeTag = (name: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams();
+      for (const [k, v] of prev.entries()) {
+        if (k === "tag" && v === name) continue;
+        if (k === "page") continue;
+        next.append(k, v);
+      }
       return next;
     });
   };
@@ -105,11 +118,12 @@ function LibraryLayout() {
       >
         <FilterSidebar
           selectedActor={actor}
-          selectedTag={tag}
+          selectedTags={tags}
           selectedStatus={status}
           noCover={noCover}
           onActorChange={(a) => { setActor(a); navigate({ pathname: "/", search: `?actor=${encodeURIComponent(a)}` }); }}
-          onTagChange={setTag}
+          onTagAdd={addTag}
+          onTagRemove={removeTag}
           onStatusChange={setStatus}
           onNoCoverChange={setNoCover}
         />
@@ -117,7 +131,7 @@ function LibraryLayout() {
 
       <Box component="main" sx={{ flex: 1, overflowY: "auto" }}>
         <Routes>
-          <Route path="/" element={<LibraryPage actor={actor} tag={tag} status={status} noCover={noCover} />} />
+          <Route path="/" element={<LibraryPage actor={actor} tags={tags} status={status} noCover={noCover} onTagAdd={addTag} onTagRemove={removeTag} />} />
           <Route path="/video/:id" element={<VideoDetailPage />} />
         </Routes>
       </Box>
@@ -125,12 +139,20 @@ function LibraryLayout() {
   );
 }
 
-function LibraryPage({ actor, tag, status, noCover }: { actor: string; tag: string; status: string; noCover: boolean }) {
+function LibraryPage({ actor, tags, status, noCover, onTagAdd, onTagRemove }: {
+  actor: string;
+  tags: string[];
+  status: string;
+  noCover: boolean;
+  onTagAdd: (name: string) => void;
+  onTagRemove: (name: string) => void;
+}) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [q, setQ] = useState(searchParams.get("q") ?? "");
   const [videos, setVideos] = useState<VideoSummary[]>([]);
   const [total, setTotal] = useState(0);
+  const [tagFacets, setTagFacets] = useState<TagFacet[]>([]);
   const currentPage = Number(searchParams.get("page") ?? "1");
 
   const setPage = (p: number) => {
@@ -157,15 +179,17 @@ function LibraryPage({ actor, tag, status, noCover }: { actor: string; tag: stri
         page_size: PAGE_SIZE,
         q: q || undefined,
         actor: actor || undefined,
-        tag: tag || undefined,
+        tag: tags.length ? tags : undefined,
         status: status || undefined,
         no_cover: noCover || undefined,
+        include_facets: true,
       })
       .then((r) => {
         setVideos(r.data.items);
         setTotal(r.data.total);
+        setTagFacets(r.data.tag_facets ?? []);
       });
-  }, [q, actor, tag, status, noCover, currentPage]);
+  }, [q, actor, JSON.stringify(tags), status, noCover, currentPage]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -174,9 +198,22 @@ function LibraryPage({ actor, tag, status, noCover }: { actor: string; tag: stri
       <Box sx={{ mb: 2 }}>
         <SearchBar value={q} onChange={setQ} />
       </Box>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        共 {total} 部影片
-      </Typography>
+      {tagFacets.length > 0 && (
+        <Box sx={{ mb: 2 }}>
+          <TagFacetBar
+            selectedTags={tags}
+            tagFacets={tagFacets}
+            totalCount={total}
+            onAdd={onTagAdd}
+            onRemove={onTagRemove}
+          />
+        </Box>
+      )}
+      {tags.length === 0 && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          共 {total} 部影片
+        </Typography>
+      )}
       <VideoGrid videos={videos} onSelect={(id) => navigate(`/video/${id}`)} />
       {totalPages > 1 && (
         <Stack alignItems="center" sx={{ mt: 3 }}>

@@ -37,11 +37,17 @@ export interface VideoDetail extends VideoSummary {
   tags: Tag[];
 }
 
+export interface TagFacet {
+  name: string;
+  count: number;
+}
+
 export interface VideoListResponse {
   total: number;
   page: number;
   page_size: number;
   items: VideoSummary[];
+  tag_facets?: TagFacet[];
 }
 
 export interface ActorWithCount extends Actor {
@@ -77,11 +83,26 @@ export const videosApi = {
     page_size?: number;
     q?: string;
     actor?: string;
-    tag?: string;
+    tag?: string[];
     status?: string;
     no_cover?: boolean;
     exclude_unmatched?: boolean;
-  }) => client.get<VideoListResponse>("/api/videos", { params }),
+    include_facets?: boolean;
+  }) => client.get<VideoListResponse>("/api/videos", {
+    params,
+    paramsSerializer: (p) => {
+      const sp = new URLSearchParams();
+      for (const [k, v] of Object.entries(p as Record<string, unknown>)) {
+        if (v === undefined || v === null) continue;
+        if (Array.isArray(v)) {
+          v.forEach((item) => sp.append(k, String(item)));
+        } else {
+          sp.append(k, String(v));
+        }
+      }
+      return sp.toString();
+    },
+  }),
 
   get: (id: number) => client.get<VideoDetail>(`/api/videos/${id}`),
 
@@ -134,6 +155,8 @@ export const actorsApi = {
   getPhoto: (id: number) => client.get<{ photo_url: string | null }>(`/api/actors/${id}/photo`),
   refetchVideos: (id: number) =>
     client.post<{ status: string; count: number; actor: string }>(`/api/actors/${id}/refetch`),
+  getTags: (actorName: string) =>
+    client.get<TagWithCount[]>(`/api/actors/${encodeURIComponent(actorName)}/tags`),
 };
 
 export const tagsApi = {

@@ -17,16 +17,17 @@ import { type ActorWithCount, type TagWithCount, actorsApi, tagsApi } from "../a
 
 interface Props {
   selectedActor: string;
-  selectedTag: string;
+  selectedTags: string[];
   selectedStatus: string;
   noCover: boolean;
   onActorChange: (name: string) => void;
-  onTagChange: (name: string) => void;
+  onTagAdd: (name: string) => void;
+  onTagRemove: (name: string) => void;
   onStatusChange: (status: string) => void;
   onNoCoverChange: (val: boolean) => void;
 }
 
-export default function FilterSidebar({ selectedActor, selectedTag, selectedStatus, noCover, onActorChange, onTagChange, onStatusChange, onNoCoverChange }: Props) {
+export default function FilterSidebar({ selectedActor, selectedTags, selectedStatus, noCover, onActorChange, onTagAdd, onTagRemove, onStatusChange, onNoCoverChange }: Props) {
   const [actors, setActors] = useState<ActorWithCount[]>([]);
   const [tags, setTags] = useState<TagWithCount[]>([]);
   const [actorQ, setActorQ] = useState("");
@@ -192,34 +193,29 @@ export default function FilterSidebar({ selectedActor, selectedTag, selectedStat
           }}
         />
 
-        {selectedTag && (
-          <Chip
-            label={selectedTag}
-            size="small"
-            onDelete={() => onTagChange("")}
-            color="primary"
-            sx={{ mb: 1, maxWidth: "100%", fontSize: 12 }}
-          />
-        )}
-
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-          {filteredTags
-            .filter((t) => t.name !== selectedTag)
-            .map((t) => (
+          {filteredTags.map((t) => {
+            const isSelected = selectedTags.includes(t.name);
+            return (
               <Chip
                 key={t.id}
                 label={t.name}
                 size="small"
-                onClick={() => onTagChange(t.name)}
+                color={isSelected ? "primary" : "default"}
+                variant={isSelected ? "filled" : "outlined"}
+                onClick={() => isSelected ? onTagRemove(t.name) : onTagAdd(t.name)}
                 sx={{
                   fontSize: 11,
                   height: 22,
-                  bgcolor: "action.selected",
-                  "&:hover": { bgcolor: "action.hover" },
                   cursor: "pointer",
+                  ...(!isSelected && {
+                    bgcolor: "action.selected",
+                    "&:hover": { bgcolor: "action.hover" },
+                  }),
                 }}
               />
-            ))}
+            );
+          })}
         </Box>
       </Box>
     </Box>
