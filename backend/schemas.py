@@ -78,11 +78,17 @@ class VideoDetail(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TagFacet(BaseModel):
+    name: str
+    count: int
+
+
 class VideoListResponse(BaseModel):
     total: int
     page: int
     page_size: int
     items: list[VideoSummary]
+    tag_facets: list[TagFacet] | None = None
 
 
 class VideoUpdate(BaseModel):

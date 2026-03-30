@@ -5,8 +5,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.models import Actor, Video, VideoActor
-from backend.schemas import ActorPhotoResponse, ActorWithCount
+from backend.models import Actor, Tag, Video, VideoActor, VideoTag
+from backend.schemas import ActorPhotoResponse, ActorWithCount, TagWithCount
 
 router = APIRouter(prefix="/api/actors", tags=["actors"])
 
@@ -28,6 +28,31 @@ def list_actors(db: Session = Depends(get_db)):
             photo_local_path=actor.photo_local_path,
         )
         for actor, count in rows
+    ]
+
+
+@router.get("/{actor_name}/tags", response_model=list[TagWithCount])
+def list_actor_tags(actor_name: str, db: Session = Depends(get_db)):
+    actor = db.query(Actor).filter(Actor.name == actor_name).first()
+    if not actor:
+        raise HTTPException(status_code=404, detail="Actor not found")
+
+    video_ids = (
+        db.query(VideoActor.video_id)
+        .filter(VideoActor.actor_id == actor.id)
+        .subquery()
+    )
+    rows = (
+        db.query(Tag, func.count(VideoTag.video_id).label("video_count"))
+        .join(VideoTag, VideoTag.tag_id == Tag.id)
+        .filter(VideoTag.video_id.in_(video_ids.select()))
+        .group_by(Tag.id)
+        .order_by(func.count(VideoTag.video_id).desc())
+        .all()
+    )
+    return [
+        TagWithCount(id=t.id, name=t.name, video_count=count)
+        for t, count in rows
     ]
 
 

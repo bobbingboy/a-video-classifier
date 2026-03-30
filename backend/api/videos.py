@@ -1,14 +1,14 @@
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from backend.database import get_db
 from backend.models import Actor, Studio, Tag, Video, VideoActor, VideoTag
-from backend.schemas import SetTitleRequest, VideoDetail, VideoListResponse, VideoSummary, VideoUpdate
+from backend.schemas import SetTitleRequest, TagFacet, VideoDetail, VideoListResponse, VideoSummary, VideoUpdate
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
 
@@ -19,10 +19,11 @@ def list_videos(
     page_size: int = 24,
     q: str | None = None,
     actor: str | None = None,
-    tag: str | None = None,
+    tag: list[str] = Query(default=[]),
     status: str | None = None,
     no_cover: bool = False,
     exclude_unmatched: bool = False,
+    include_facets: bool = False,
     db: Session = Depends(get_db),
 ):
     query = db.query(Video)
@@ -51,9 +52,9 @@ def list_videos(
             Video.actors.any(VideoActor.actor.has(Actor.name.ilike(f"%{actor}%")))
         )
 
-    if tag:
+    for t in tag:
         query = query.filter(
-            Video.tags.any(VideoTag.tag.has(Tag.name.ilike(f"%{tag}%")))
+            Video.tags.any(VideoTag.tag.has(Tag.name.ilike(f"%{t}%")))
         )
 
     total = query.count()
@@ -64,6 +65,46 @@ def list_videos(
         .limit(page_size)
         .all()
     )
+
+    tag_facets = None
+    if include_facets:
+        # Count videos per tag within the current filter (before tag filtering)
+        # Rebuild base query without tag filters to get facets
+        base_query = db.query(Video)
+        if status:
+            base_query = base_query.filter(Video.status == status)
+        if no_cover:
+            base_query = base_query.filter(~Video.has_cover)
+        if exclude_unmatched:
+            base_query = base_query.filter(Video.status != "unmatched")
+        if q:
+            like = f"%{q}%"
+            base_query = base_query.filter(
+                or_(
+                    Video.code.ilike(like),
+                    Video.title.ilike(like),
+                    Video.actors.any(VideoActor.actor.has(Actor.name.ilike(like))),
+                )
+            )
+        if actor:
+            base_query = base_query.filter(
+                Video.actors.any(VideoActor.actor.has(Actor.name.ilike(f"%{actor}%")))
+            )
+        # Apply already-selected tags so facets reflect the AND intersection
+        for t in tag:
+            base_query = base_query.filter(
+                Video.tags.any(VideoTag.tag.has(Tag.name.ilike(f"%{t}%")))
+            )
+
+        facet_rows = (
+            db.query(Tag.name, func.count(VideoTag.video_id))
+            .join(VideoTag, VideoTag.tag_id == Tag.id)
+            .filter(VideoTag.video_id.in_(base_query.with_entities(Video.id).subquery().select()))
+            .group_by(Tag.name)
+            .order_by(func.count(VideoTag.video_id).desc())
+            .all()
+        )
+        tag_facets = [TagFacet(name=name, count=count) for name, count in facet_rows]
 
     return VideoListResponse(
         total=total,
@@ -78,6 +119,7 @@ def list_videos(
             "metadata_source": v.metadata_source,
             "tags": [vt.tag for vt in v.tags if vt.tag],
         }) for v in items],
+        tag_facets=tag_facets,
     )
 
 
