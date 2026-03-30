@@ -17,6 +17,8 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EditIcon from "@mui/icons-material/Edit";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import VolumeOffIcon from "@mui/icons-material/VolumeOff";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import SaveIcon from "@mui/icons-material/Save";
 import CloseIcon from "@mui/icons-material/Close";
 import { type CodePreview, type VideoDetail as IVideoDetail, type VideoUpdate, scanApi, videosApi } from "../api/videos";
@@ -35,6 +37,7 @@ export default function VideoDetailPage() {
   const [form, setForm] = useState<VideoUpdate>({});
   const [saving, setSaving] = useState(false);
   const [videoStarted, setVideoStarted] = useState(false);
+  const [preMuted, setPreMuted] = useState(() => localStorage.getItem("player:muted") === "1");
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // 番號修改狀態
@@ -226,6 +229,25 @@ export default function VideoDetailPage() {
                     >
                       <PlayArrowIcon sx={{ fontSize: 44, color: "white", ml: "3px" }} />
                     </Box>
+                    <IconButton
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const next = !preMuted;
+                        setPreMuted(next);
+                        localStorage.setItem("player:muted", next ? "1" : "0");
+                      }}
+                      size="small"
+                      sx={{
+                        position: "absolute",
+                        bottom: 10,
+                        right: 10,
+                        bgcolor: "rgba(0,0,0,0.55)",
+                        "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
+                        color: "white",
+                      }}
+                    >
+                      {preMuted ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
+                    </IconButton>
                   </Box>
                 </Box>
               )
