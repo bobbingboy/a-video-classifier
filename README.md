@@ -93,6 +93,17 @@ cp .env.example .env
 |----------|------|
 | `OPENROUTER_API_KEY` | OpenRouter API 金鑰，用於爬蟲皆失敗時的 AI 備援查詢。不設定則跳過 AI 備援 |
 | `VIDEOS_FOLDERS` | 影片資料夾路徑，多個路徑以逗號分隔。系統會遞迴掃描每個路徑下的所有子資料夾 |
+| `DATABASE_URL` | 資料庫連線字串（見下方說明）。不設定則預設使用 SQLite |
+
+### 資料庫配置
+
+預設使用 SQLite，無需額外設定。如需使用其他資料庫，在 `.env` 中設定 `DATABASE_URL`：
+
+| 資料庫 | DATABASE_URL 格式 | 需安裝 Driver |
+|--------|-------------------|---------------|
+| SQLite（預設） | `sqlite:///../videos.db` | 不需要 |
+| PostgreSQL | `postgresql://user:password@host:5432/dbname` | `pip install psycopg2-binary` |
+| MySQL | `mysql+pymysql://user:password@host:3306/dbname` | `pip install pymysql` |
 
 ### Frontend
 
