@@ -28,5 +28,5 @@ Thumbs.db
 # Local covers cache
 covers/
 
-# Claude Code local config
-.claude/
+# Claude Code local config (personal permissions, not shared)
+.claude/settings.local.json
