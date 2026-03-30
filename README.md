@@ -12,14 +12,15 @@
 - **影片播放** — 內建播放器，音量設定持久化至 localStorage
 - **手動校正** — 編輯標題、演員、標籤、片商、時長、發行日期
 - **批次操作** — 批量抓取缺少的封面圖片
-- **篩選系統** — 依演員、標籤、狀態（未辨識、無封面）篩選
+- **篩選系統** — 依演員、標籤、狀態（未辨識、無封面）篩選，支援多標籤交集篩選與 facet 數量顯示
+- **封面管理** — 封面圖片與演員頭像儲存於 DB 獨立表，支援從本地檔案批次遷移
 
 ## 技術架構
 
 ### Backend
 
 - **FastAPI** + **Uvicorn** — REST API 伺服器
-- **SQLAlchemy** + **SQLite** — ORM 與資料庫
+- **SQLAlchemy** — ORM（支援 SQLite / PostgreSQL / MySQL）
 - **httpx** + **BeautifulSoup4** — 非同步 HTTP 與 HTML 解析
 - **OpenAI SDK** — 串接 OpenRouter AI 備援
 
@@ -30,16 +31,18 @@
 - **Material-UI (MUI)** — 元件庫（Dark Theme）
 - **React Router** — 客戶端路由
 - **Axios** — HTTP 請求
+- **Framer Motion** — 動畫效果
 
 ### 專案結構
 
 ```
 backend/
 ├── main.py              # FastAPI 入口，掛載靜態檔與路由
-├── models.py            # SQLAlchemy ORM 模型
-├── database.py          # 資料庫連線與 session 管理
+├── models.py            # SQLAlchemy ORM 模型（含 VideoImage、ActorImage 圖片表）
+├── database.py          # 資料庫連線與 session 管理（支援多種 DB 引擎）
 ├── scanner.py           # 檔案掃描與番號解析
 ├── schemas.py           # Pydantic schema
+├── migrate_covers.py    # 封面/頭像遷移工具（本地檔案 → DB）
 ├── api/                 # API 路由
 │   ├── videos.py        # 影片 CRUD、搜尋、篩選
 │   ├── scan.py          # 掃描觸發與進度查詢
@@ -55,7 +58,7 @@ backend/
 
 frontend/src/
 ├── api/                 # API 客戶端層
-├── components/          # 共用元件（FilterSidebar、SearchBar、VideoGrid）
+├── components/          # 共用元件（FilterSidebar、SearchBar、VideoGrid、TagFacetBar）
 ├── pages/               # 頁面（VideoDetail、ScanPage）
 ├── App.tsx              # 主佈局與影片庫頁面
 ├── theme.ts             # MUI 深色主題設定
@@ -105,6 +108,20 @@ cp .env.example .env
 | PostgreSQL | `postgresql://user:password@host:5432/dbname` | `pip install psycopg2-binary` |
 | MySQL | `mysql+pymysql://user:password@host:3306/dbname` | `pip install pymysql` |
 
+### 封面圖片遷移
+
+如果專案已有本地封面圖片（`covers/`、`actor_photos/` 目錄），需執行遷移工具將圖片寫入資料庫：
+
+```bash
+python -m backend.migrate_covers
+```
+
+加上 `--clean` 可在遷移成功後刪除本地檔案：
+
+```bash
+python -m backend.migrate_covers --clean
+```
+
 ### Frontend
 
 ```bash
@@ -121,10 +138,14 @@ npm run dev
 |------|------|
 | `GET /api/videos` | 影片列表（分頁、篩選、搜尋） |
 | `GET /api/videos/:id` | 影片詳情 |
+| `GET /api/videos/:id/cover` | 影片封面圖片 |
+| `GET /api/videos/:id/stream` | 影片串流播放 |
 | `PUT /api/videos/:id` | 更新影片 metadata |
 | `POST /api/scan` | 觸發資料夾掃描 |
 | `GET /api/scan/status` | 掃描進度 |
 | `GET /api/actors` | 演員列表（含影片數） |
+| `GET /api/actors/:name/tags` | 演員的所有標籤（含影片數） |
+| `GET /api/actors/:id/photo-image` | 演員頭像圖片 |
 | `GET /api/tags` | 標籤列表（含影片數） |
 | `GET /api/scrapers` | 爬蟲來源管理 |
 | `GET /api/browse` | 檔案系統瀏覽 |
