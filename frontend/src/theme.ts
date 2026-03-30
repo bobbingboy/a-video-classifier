@@ -34,6 +34,13 @@ const theme = createTheme({
         },
       },
     },
+    MuiChip: {
+      styleOverrides: {
+        label: {
+          lineHeight: 1,
+        },
+      },
+    },
     MuiAppBar: {
       styleOverrides: {
         root: {
