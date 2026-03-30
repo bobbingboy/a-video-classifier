@@ -5,7 +5,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
-from backend.models import Actor, Tag, Video, VideoActor, VideoTag
+from fastapi.responses import Response
+
+from backend.models import Actor, ActorImage, Tag, Video, VideoActor, VideoTag
 from backend.schemas import ActorPhotoResponse, ActorWithCount, TagWithCount
 
 router = APIRouter(prefix="/api/actors", tags=["actors"])
@@ -56,6 +58,18 @@ def list_actor_tags(actor_name: str, db: Session = Depends(get_db)):
     ]
 
 
+@router.get("/{actor_id}/photo-image")
+def get_actor_photo_image(actor_id: int, db: Session = Depends(get_db)):
+    img = db.query(ActorImage).filter(ActorImage.actor_id == actor_id).first()
+    if not img:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    return Response(
+        content=img.image_data,
+        media_type=img.content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @router.get("/{actor_id}/photo", response_model=ActorPhotoResponse)
 async def get_actor_photo(actor_id: int, db: Session = Depends(get_db)):
     actor = db.query(Actor).filter(Actor.id == actor_id).first()
@@ -67,7 +81,7 @@ async def get_actor_photo(actor_id: int, db: Session = Depends(get_db)):
 
     from backend.scrapers.actor_photo import fetch_actor_photo
 
-    local_path = await fetch_actor_photo(actor.name)
+    local_path = await fetch_actor_photo(actor.name, actor_id=actor.id, db=db)
     if local_path:
         actor.photo_local_path = local_path
         db.commit()

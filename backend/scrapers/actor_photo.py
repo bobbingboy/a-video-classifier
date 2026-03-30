@@ -26,7 +26,7 @@ HEADERS = {
 }
 
 
-async def fetch_actor_photo(actor_name: str) -> str | None:
+async def fetch_actor_photo(actor_name: str, actor_id: int | None = None, db=None) -> str | None:
     """
     Search for an actress on Javbus and download their profile photo.
     Returns the local relative path (e.g. 'actor_photos/山岸逢花.jpg') or None.
@@ -41,7 +41,7 @@ async def fetch_actor_photo(actor_name: str) -> str | None:
     if not photo_url:
         return None
 
-    return await _download_photo(actor_name, photo_url)
+    return await _download_photo(actor_name, photo_url, actor_id=actor_id, db=db)
 
 
 async def _find_star_page(name: str) -> str | None:
@@ -81,7 +81,7 @@ async def _extract_photo_url(star_url: str) -> str | None:
     return None
 
 
-async def _download_photo(name: str, url: str) -> str | None:
+async def _download_photo(name: str, url: str, actor_id: int | None = None, db=None) -> str | None:
     # Sanitize name for use as filename
     import re
     safe_name = re.sub(r'[<>:"/\\|?*]', "_", name)
@@ -92,8 +92,23 @@ async def _download_photo(name: str, url: str) -> str | None:
         async with httpx.AsyncClient(headers=HEADERS, timeout=20, follow_redirects=True) as client:
             resp = await client.get(url)
             if resp.status_code == 200:
-                dest.write_bytes(resp.content)
+                image_bytes = resp.content
+                dest.write_bytes(image_bytes)
+                # Save to DB if possible
+                if actor_id and db:
+                    _save_photo_to_db(actor_id, image_bytes, resp.headers.get("content-type", "image/jpeg"), db)
                 return f"actor_photos/{safe_name}{ext}"
     except httpx.RequestError:
         pass
     return None
+
+
+def _save_photo_to_db(actor_id: int, image_data: bytes, content_type: str, db) -> None:
+    from backend.models import ActorImage
+    existing = db.query(ActorImage).filter(ActorImage.actor_id == actor_id).first()
+    if existing:
+        existing.image_data = image_data
+        existing.content_type = content_type
+    else:
+        db.add(ActorImage(actor_id=actor_id, image_data=image_data, content_type=content_type))
+    db.commit()

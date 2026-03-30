@@ -221,9 +221,9 @@ async def _legacy_fetch(code: str) -> dict | None:
     return merged
 
 
-async def download_cover(code: str, url: str) -> str | None:
+async def download_cover(code: str, url: str, video_id: int | None = None, db=None) -> str | None:
     """
-    Download cover image to covers/<code>.jpg.
+    Download cover image and save to DB (if video_id and db provided) and local file.
     Returns the local relative path or None on failure.
     """
     if not url:
@@ -250,7 +250,12 @@ async def download_cover(code: str, url: str) -> str | None:
         async with httpx.AsyncClient(headers=headers, timeout=20, follow_redirects=True) as client:
             resp = await client.get(url)
             if resp.status_code == 200:
-                local_path.write_bytes(resp.content)
+                image_bytes = resp.content
+                # Save to local file
+                local_path.write_bytes(image_bytes)
+                # Save to DB if possible
+                if video_id and db:
+                    _save_cover_to_db(video_id, image_bytes, resp.headers.get("content-type", "image/jpeg"), db)
                 return f"covers/{code}{ext}"
             else:
                 log.warning("封面下載失敗 %s — HTTP %s (%s)", code, resp.status_code, url)
@@ -258,3 +263,14 @@ async def download_cover(code: str, url: str) -> str | None:
         log.warning("封面下載失敗 %s — 連線錯誤: %s (%s)", code, e, url)
 
     return None
+
+
+def _save_cover_to_db(video_id: int, image_data: bytes, content_type: str, db) -> None:
+    from backend.models import VideoImage
+    existing = db.query(VideoImage).filter(VideoImage.video_id == video_id).first()
+    if existing:
+        existing.image_data = image_data
+        existing.content_type = content_type
+    else:
+        db.add(VideoImage(video_id=video_id, image_data=image_data, content_type=content_type))
+    db.commit()

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, UniqueConstraint, and_
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, LargeBinary, String, UniqueConstraint, and_
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 
@@ -124,3 +124,25 @@ class VideoTag(Base):
 
     video = relationship("Video", back_populates="tags")
     tag = relationship("Tag", back_populates="videos")
+
+
+class VideoImage(Base):
+    __tablename__ = "video_images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    video_id = Column(Integer, ForeignKey("videos.id"), nullable=False, unique=True)
+    image_data = Column(LargeBinary, nullable=False)
+    content_type = Column(String, nullable=False, default="image/jpeg")
+
+    video = relationship("Video", backref="image", uselist=False)
+
+
+class ActorImage(Base):
+    __tablename__ = "actor_images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    actor_id = Column(Integer, ForeignKey("actors.id"), nullable=False, unique=True)
+    image_data = Column(LargeBinary, nullable=False)
+    content_type = Column(String, nullable=False, default="image/jpeg")
+
+    actor = relationship("Actor", backref="image", uselist=False)

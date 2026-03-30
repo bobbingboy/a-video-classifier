@@ -2,12 +2,12 @@ import re
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from backend.database import get_db
-from backend.models import Actor, Studio, Tag, Video, VideoActor, VideoTag
+from backend.models import Actor, Studio, Tag, Video, VideoActor, VideoImage, VideoTag
 from backend.schemas import SetTitleRequest, TagFacet, VideoDetail, VideoListResponse, VideoSummary, VideoUpdate
 
 router = APIRouter(prefix="/api/videos", tags=["videos"])
@@ -204,6 +204,18 @@ def update_video(video_id: int, data: VideoUpdate, db: Session = Depends(get_db)
     db.commit()
     db.refresh(video)
     return get_video(video_id, db)
+
+
+@router.get("/{video_id}/cover")
+def get_video_cover(video_id: int, db: Session = Depends(get_db)):
+    img = db.query(VideoImage).filter(VideoImage.video_id == video_id).first()
+    if not img:
+        raise HTTPException(status_code=404, detail="Cover not found")
+    return Response(
+        content=img.image_data,
+        media_type=img.content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @router.get("/{video_id}/stream")

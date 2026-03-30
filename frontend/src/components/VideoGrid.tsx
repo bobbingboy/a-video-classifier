@@ -1,12 +1,13 @@
+import { useState } from "react";
 import {
   Grid,
   Card,
   CardActionArea,
-  CardMedia,
   CardContent,
   Typography,
   Box,
   Chip,
+  Skeleton,
 } from "@mui/material";
 import { type VideoSummary } from "../api/videos";
 
@@ -15,9 +16,8 @@ interface Props {
   onSelect: (id: number) => void;
 }
 
-function coverSrc(path: string | null): string {
-  if (!path) return "";
-  return `http://localhost:8000/${path}`;
+function coverSrc(video: VideoSummary): string {
+  return `http://localhost:8000/api/videos/${video.id}/cover`;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -25,6 +25,53 @@ const STATUS_COLOR: Record<string, string> = {
   unmatched: "#f59e0b",
   needs_manual_review: "#ef4444",
 };
+
+function CoverImage({ video }: { video: VideoSummary }) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  if (!video.cover_local_path || error) {
+    return (
+      <Box
+        sx={{
+          aspectRatio: "16/9",
+          bgcolor: "#1e1e1e",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Typography variant="caption" color="text.disabled">No Cover</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ position: "relative", aspectRatio: "16/9", overflow: "hidden" }}>
+      {!loaded && (
+        <Skeleton
+          variant="rectangular"
+          animation="wave"
+          sx={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+        />
+      )}
+      <Box
+        component="img"
+        src={coverSrc(video)}
+        alt={video.title || video.code}
+        onLoad={() => setLoaded(true)}
+        onError={() => setError(true)}
+        sx={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          opacity: loaded ? 1 : 0,
+          transition: "opacity 0.3s ease-in",
+        }}
+      />
+    </Box>
+  );
+}
 
 export default function VideoGrid({ videos, onSelect }: Props) {
   return (
@@ -43,26 +90,7 @@ export default function VideoGrid({ videos, onSelect }: Props) {
           >
             <CardActionArea onClick={() => onSelect(v.id)} sx={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "stretch" }}>
               <Box sx={{ position: "relative" }}>
-                {v.cover_local_path ? (
-                  <CardMedia
-                    component="img"
-                    image={coverSrc(v.cover_local_path)}
-                    alt={v.title || v.code}
-                    sx={{ aspectRatio: "16/9", objectFit: "cover" }}
-                  />
-                ) : (
-                  <Box
-                    sx={{
-                      aspectRatio: "16/9",
-                      bgcolor: "#1e1e1e",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Typography variant="caption" color="text.disabled">No Cover</Typography>
-                  </Box>
-                )}
+                <CoverImage video={v} />
                 {v.status !== "ok" && (
                   <Box sx={{ position: "absolute", top: 6, right: 6 }}>
                     <Box

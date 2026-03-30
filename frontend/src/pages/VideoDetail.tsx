@@ -21,9 +21,8 @@ import SaveIcon from "@mui/icons-material/Save";
 import CloseIcon from "@mui/icons-material/Close";
 import { type CodePreview, type VideoDetail as IVideoDetail, type VideoUpdate, scanApi, videosApi } from "../api/videos";
 
-function coverSrc(path: string | null): string {
-  if (!path) return "";
-  return `http://localhost:8000/${path}`;
+function coverSrc(videoId: number): string {
+  return `http://localhost:8000/api/videos/${videoId}/cover`;
 }
 
 export default function VideoDetailPage() {
@@ -189,7 +188,7 @@ export default function VideoDetailPage() {
                   {video.cover_local_path ? (
                     <Box
                       component="img"
-                      src={coverSrc(video.cover_local_path)}
+                      src={coverSrc(video.id)}
                       alt={video.title || video.code}
                       sx={{ width: "100%", display: "block" }}
                     />
@@ -233,7 +232,7 @@ export default function VideoDetailPage() {
             ) : (
               <Box
                 component="img"
-                src={coverSrc(video.cover_local_path!)}
+                src={coverSrc(video.id)}
                 alt={video.title || video.code}
                 sx={{ width: "100%", display: "block" }}
               />

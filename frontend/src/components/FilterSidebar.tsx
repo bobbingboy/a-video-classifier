@@ -132,7 +132,7 @@ export default function FilterSidebar({ selectedActor, selectedTags, selectedSta
                 }}
               >
                 <Avatar
-                  src={a.photo_local_path ? `http://localhost:8000/${a.photo_local_path}` : undefined}
+                  src={a.photo_local_path ? `http://localhost:8000/api/actors/${a.id}/photo-image` : undefined}
                   alt={a.name}
                   sx={{ width: 24, height: 24, fontSize: 11, flexShrink: 0 }}
                 >
