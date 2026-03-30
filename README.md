@@ -79,11 +79,20 @@ uvicorn main:app --reload
 
 預設啟動於 `http://localhost:8000`。
 
-如需 AI 備援功能，設定環境變數：
+### 環境變數設定
+
+專案根目錄提供了 `.env.example` 範例檔，複製一份並重新命名為 `.env`：
 
 ```bash
-OPENROUTER_API_KEY=your_key_here
+cp .env.example .env
 ```
+
+然後編輯 `.env`，填入對應的值：
+
+| 變數名稱 | 說明 |
+|----------|------|
+| `OPENROUTER_API_KEY` | OpenRouter API 金鑰，用於爬蟲皆失敗時的 AI 備援查詢。不設定則跳過 AI 備援 |
+| `VIDEOS_FOLDERS` | 影片資料夾路徑，多個路徑以逗號分隔。系統會遞迴掃描每個路徑下的所有子資料夾 |
 
 ### Frontend
 
